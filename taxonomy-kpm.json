@@ -1,0 +1,351 @@
+{
+  "metadata": {
+    "nama": "Taxonomy Kategori Isu KPM",
+    "instansi": "Kementerian Komunikasi dan Digital (Komdigi)",
+    "versi": "3.0",
+    "tanggal": "2026-03-13",
+    "owner": "Tim 1 — AITF KPM UGM",
+    "disetujui_oleh": [
+      "Tim 1",
+      "Tim 2"
+    ],
+    "catatan": "Taxonomy final: 3 Kategori Utama → 11 Sub Kategori"
+  },
+  "kategori_utama": [
+    {
+      "id": "POG",
+      "label": "Politics & Governance",
+      "deskripsi": "Isu seputar tata kelola pemerintahan, kebijakan publik, penegakan hukum, dan keamanan ruang digital",
+      "warna_dashboard": "#991B1B",
+      "sub_kategori": [
+        {
+          "id": "IPH",
+          "label": "Integritas & Penegakan Hukum",
+          "deskripsi": "Isu seputar korupsi, penegakan hukum, transparansi lembaga negara, dan akuntabilitas pejabat publik",
+          "warna_dashboard": "#DC2626",
+          "prioritas_monitoring": "tinggi",
+          "contoh": [
+            "Kasus korupsi pejabat",
+            "Penindakan pelanggaran UU ITE",
+            "Laporan LHKPN",
+            "Reformasi birokrasi"
+          ]
+        },
+        {
+          "id": "KLP",
+          "label": "Kebijakan & Layanan Publik",
+          "deskripsi": "Isu seputar regulasi pemerintah, implementasi kebijakan, dan kualitas layanan kepada masyarakat",
+          "warna_dashboard": "#2563EB",
+          "prioritas_monitoring": "tinggi",
+          "contoh": [
+            "Terbitnya PP atau Permen baru",
+            "Implementasi kebijakan berjalan",
+            "INA Digital, e-government",
+            "Petisi atau penolakan kebijakan"
+          ]
+        },
+        {
+          "id": "KPM",
+          "label": "Kinerja Pemerintah",
+          "deskripsi": "Isu seputar evaluasi dan persepsi publik atas kinerja pejabat, kementerian, dan lembaga pemerintah",
+          "warna_dashboard": "#0369A1",
+          "prioritas_monitoring": "sedang",
+          "contoh": [
+            "Audit BPK, laporan capaian kementerian",
+            "Kontroversi pernyataan menteri",
+            "Realisasi APBN, proyek mangkrak",
+            "Survei kepuasan layanan publik"
+          ]
+        },
+        {
+          "id": "KSD",
+          "label": "Keamanan Siber & Ketertiban Digital",
+          "deskripsi": "Isu seputar ancaman digital, konten berbahaya, penegakan ketertiban ruang digital, dan perlindungan data",
+          "warna_dashboard": "#0D9488",
+          "prioritas_monitoring": "tinggi",
+          "contoh": [
+            "Data breach lembaga pemerintah atau korporasi",
+            "Hoaks dan disinformasi",
+            "Judi online, pornografi, radikalisme digital",
+            "Implementasi UU PDP",
+            "Phishing, scam investasi, TPPO digital"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ECD",
+      "label": "Economy & Development",
+      "deskripsi": "Isu seputar kesejahteraan sosial, pembangunan infrastruktur, ekonomi digital, dan ketenagakerjaan",
+      "warna_dashboard": "#92400E",
+      "sub_kategori": [
+        {
+          "id": "KBS",
+          "label": "Kesejahteraan & Bantuan Sosial",
+          "deskripsi": "Isu seputar program bansos, perlindungan sosial, kemiskinan, dan kesejahteraan masyarakat",
+          "warna_dashboard": "#16A34A",
+          "prioritas_monitoring": "sedang",
+          "contoh": [
+            "PKH, BLT, bansos tunai, BPNT",
+            "Penyaluran tidak tepat sasaran",
+            "Angka kemiskinan, gini ratio",
+            "BPJS Ketenagakerjaan, jaminan hari tua"
+          ]
+        },
+        {
+          "id": "ILT",
+          "label": "Infrastruktur & Layanan Transportasi",
+          "deskripsi": "Isu seputar pembangunan infrastruktur fisik dan digital, transportasi publik, dan konektivitas wilayah",
+          "warna_dashboard": "#B45309",
+          "prioritas_monitoring": "sedang",
+          "contoh": [
+            "BTS, fiber optik, satelit Satria, internet desa",
+            "KRL, MRT, kereta cepat",
+            "Jalan tol, jalan rusak, proyek PUPR",
+            "Listrik, air bersih, BBM"
+          ]
+        },
+        {
+          "id": "EKD",
+          "label": "Ekonomi Digital",
+          "deskripsi": "Isu seputar ekosistem digital, e-commerce, startup, transformasi ekonomi berbasis teknologi, dan regulasi platform",
+          "warna_dashboard": "#7C3AED",
+          "prioritas_monitoring": "sedang",
+          "contoh": [
+            "Regulasi marketplace, UMKM online",
+            "QRIS, pinjol, fintech, kripto",
+            "Startup unicorn, ekosistem inovasi",
+            "PSE, pajak digital, kebijakan algoritma"
+          ]
+        },
+        {
+          "id": "KTK",
+          "label": "Ketenagakerjaan",
+          "deskripsi": "Isu seputar lapangan kerja, hubungan industrial, upah, PHK, dan kondisi tenaga kerja Indonesia",
+          "warna_dashboard": "#EA580C",
+          "prioritas_monitoring": "sedang",
+          "contoh": [
+            "PHK massal, angka pengangguran",
+            "UMR, UMP, K3, kondisi kerja",
+            "TKA ilegal, displasemen pekerja lokal",
+            "Kartu Prakerja, pelatihan vokasi"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "SEH",
+      "label": "Social, Environment, & Health",
+      "deskripsi": "Isu seputar layanan kesehatan, pendidikan, pengembangan SDM, dan krisis sosial serta kebencanaan",
+      "warna_dashboard": "#065F46",
+      "sub_kategori": [
+        {
+          "id": "LKS",
+          "label": "Layanan Kesehatan",
+          "deskripsi": "Isu seputar akses dan kualitas layanan kesehatan, BPJS, wabah, dan kebijakan kesehatan nasional",
+          "warna_dashboard": "#BE123C",
+          "prioritas_monitoring": "tinggi",
+          "contoh": [
+            "Defisit BPJS, penolakan pasien, klaim JKN",
+            "KLB penyakit, pandemi, outbreak lokal",
+            "Kekurangan dokter di daerah, nakes honorer",
+            "Hoaks seputar vaksin atau obat-obatan"
+          ]
+        },
+        {
+          "id": "PSD",
+          "label": "Pendidikan dan Pengembangan SDM",
+          "deskripsi": "Isu seputar kualitas pendidikan, akses sekolah, pengembangan talenta digital, dan literasi masyarakat",
+          "warna_dashboard": "#9333EA",
+          "prioritas_monitoring": "sedang",
+          "contoh": [
+            "Sekolah rusak, kekurangan guru, PPDB",
+            "Literasi digital anak, remaja, lansia",
+            "Beasiswa AI, coding bootcamp, AITF",
+            "Peringkat universitas, hilirisasi riset"
+          ]
+        },
+        {
+          "id": "KSB",
+          "label": "Krisis Sosial & Kebencanaan",
+          "deskripsi": "Isu seputar bencana alam, krisis sosial, konflik komunal, dan respons penanggulangan darurat",
+          "warna_dashboard": "#475569",
+          "prioritas_monitoring": "tinggi",
+          "contoh": [
+            "Gempa bumi, banjir, tanah longsor, erupsi",
+            "Koordinasi BNPB/BPBD, distribusi bantuan",
+            "Konflik komunal, demonstrasi besar",
+            "Kelangkaan pangan, pencemaran lingkungan"
+          ]
+        }
+      ]
+    }
+  ],
+  "label_sentimen": [
+    {
+      "id": "POS",
+      "label": "Positif",
+      "deskripsi": "Konten mendukung, mengapresiasi, atau berdampak baik"
+    },
+    {
+      "id": "NEG",
+      "label": "Negatif",
+      "deskripsi": "Konten mengkritik, menolak, atau berdampak buruk"
+    },
+    {
+      "id": "NET",
+      "label": "Netral",
+      "deskripsi": "Konten informatif tanpa muatan emosi atau sikap jelas"
+    }
+  ],
+  "label_platform": [
+    {
+      "id": "TWI",
+      "label": "Twitter / X"
+    },
+    {
+      "id": "YOU",
+      "label": "YouTube"
+    },
+    {
+      "id": "FAC",
+      "label": "Facebook"
+    },
+    {
+      "id": "INS",
+      "label": "Instagram"
+    },
+    {
+      "id": "TIK",
+      "label": "TikTok"
+    },
+    {
+      "id": "BER",
+      "label": "Berita Online"
+    },
+    {
+      "id": "GTR",
+      "label": "Google Trends"
+    },
+    {
+      "id": "T24",
+      "label": "Trend24"
+    }
+  ],
+  "label_prioritas": [
+    {
+      "id": "T",
+      "label": "Tinggi",
+      "deskripsi": "Butuh respons dalam 24 jam"
+    },
+    {
+      "id": "S",
+      "label": "Sedang",
+      "deskripsi": "Butuh respons dalam 3 hari"
+    },
+    {
+      "id": "R",
+      "label": "Rendah",
+      "deskripsi": "Monitoring rutin, tidak perlu respons segera"
+    }
+  ],
+  "peta_konsistensi": {
+    "POG": [
+      "IPH",
+      "KLP",
+      "KPM",
+      "KSD"
+    ],
+    "ECD": [
+      "KBS",
+      "ILT",
+      "EKD",
+      "KTK"
+    ],
+    "SEH": [
+      "LKS",
+      "PSD",
+      "KSB"
+    ]
+  },
+  "aturan_labeling": {
+    "hierarki": "Setiap item wajib memiliki kategori_utama (POG/ECD/SEH) DAN sub_kategori. Tidak ada level ketiga.",
+    "ambiguitas": "Jika konten bisa masuk dua sub_kategori, pilih yang paling dominan dalam konteks konten.",
+    "konsistensi": "sub_kategori harus selalu konsisten dengan kategori_utama-nya sesuai peta_konsistensi.",
+    "prioritas_tinggi": "Otomatis assign prioritas TINGGI untuk IPH, KSD, LKS, KSB yang viral (engagement > 1000)."
+  },
+  "contoh_data_berlabel": [
+    {
+      "id": "SAMPLE-001",
+      "konten": "Beredar pesan berantai vaksin COVID menyebabkan autisme, sudah terbukti hoaks oleh Kemenkes",
+      "kategori_utama": "POG",
+      "sub_kategori": "KSD",
+      "sentimen": "NEG",
+      "platform": "TWI",
+      "prioritas": "T"
+    },
+    {
+      "id": "SAMPLE-002",
+      "konten": "Komdigi luncurkan program Literasi Digital Nasional menyasar 1 juta pelajar di 2026",
+      "kategori_utama": "SEH",
+      "sub_kategori": "PSD",
+      "sentimen": "POS",
+      "platform": "BER",
+      "prioritas": "S"
+    },
+    {
+      "id": "SAMPLE-003",
+      "konten": "Korban judi online di Jawa Tengah capai 12.000 orang, mayoritas usia produktif",
+      "kategori_utama": "POG",
+      "sub_kategori": "KSD",
+      "sentimen": "NEG",
+      "platform": "BER",
+      "prioritas": "T"
+    },
+    {
+      "id": "SAMPLE-004",
+      "konten": "Internet satelit Satria-1 mulai aktif di 3.700 titik layanan publik terpencil",
+      "kategori_utama": "ECD",
+      "sub_kategori": "ILT",
+      "sentimen": "POS",
+      "platform": "BER",
+      "prioritas": "S"
+    },
+    {
+      "id": "SAMPLE-005",
+      "konten": "Gelombang PHK startup teknologi Indonesia sepanjang Q1 2026 capai 8.000 pekerja",
+      "kategori_utama": "ECD",
+      "sub_kategori": "KTK",
+      "sentimen": "NEG",
+      "platform": "BER",
+      "prioritas": "T"
+    },
+    {
+      "id": "SAMPLE-006",
+      "konten": "UU Perlindungan Data Pribadi mulai berlaku penuh, perusahaan wajib tunjuk DPO",
+      "kategori_utama": "POG",
+      "sub_kategori": "KSD",
+      "sentimen": "NET",
+      "platform": "BER",
+      "prioritas": "S"
+    },
+    {
+      "id": "SAMPLE-007",
+      "konten": "Defisit BPJS Kesehatan capai Rp 15 triliun, pemerintah kaji kenaikan iuran",
+      "kategori_utama": "SEH",
+      "sub_kategori": "LKS",
+      "sentimen": "NEG",
+      "platform": "BER",
+      "prioritas": "T"
+    },
+    {
+      "id": "SAMPLE-008",
+      "konten": "Banjir bandang di Sulawesi Tengah sebabkan 3 kecamatan terisolir",
+      "kategori_utama": "SEH",
+      "sub_kategori": "KSB",
+      "sentimen": "NEG",
+      "platform": "TWI",
+      "prioritas": "T"
+    }
+  ]
+}
