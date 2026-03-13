@@ -8,3 +8,12 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Scraped output
+data/
+
+# macOS metadata
+.DS_Store
+
+# Hugging Face model cache
+.cache/
