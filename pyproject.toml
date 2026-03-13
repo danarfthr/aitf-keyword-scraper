@@ -16,3 +16,4 @@ dependencies = [
 
 [project.scripts]
 scrape = "main:main"
+scrape-run = "keyword_scraper.runner:run"
