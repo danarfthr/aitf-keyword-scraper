@@ -1,7 +1,8 @@
 # keyword-scraper
 
-Unified trending keyword scraper for **Google Trends** and **Trends24 Indonesia**, with a 3-stage relevance filter and taxonomy classification pipeline.  
-Output: `/data/merged_trends_<YYYYMMDD_HHMMSS>.json` — schema-compliant with [`scraped_item.schema.json`](./scraped_item.schema.json).
+Microservice-ready MVP that scrapes trending keywords from **Google Trends** and **Trends24 Indonesia**, lets users filter and validate them through rule-based and AI-powered pipelines, and expands relevant keywords into variants for downstream Phase 2 social media scraping.
+
+**Architecture:** Two-process deployment — FastAPI (port 8000) for REST API, Streamlit (port 8501) for human users. SQLite via SQLAlchemy 2.0 for MVP; PostgreSQL swap = one `DATABASE_URL` change.
 
 ---
 
@@ -10,12 +11,12 @@ Output: `/data/merged_trends_<YYYYMMDD_HHMMSS>.json` — schema-compliant with [
 | | Detail |
 |---|---|
 | **Sources** | Google Trends (`GTR`) · Trends24 (`T24`) |
-| **Max raw keywords** | 100 per source |
-| **Stage 0 — Relevance gate** | Drops K-pop fandom, hashtag noise, entertainment brands |
-| **Stage 1 — Rule-based** | Seed-term match → instant label, `confidence_score: null` |
-| **Stage 2 — Zero-shot NLI** | `mDeBERTa-v3-base-mnli-xnli` against 11 label descriptions |
-| **Taxonomy** | 3 `kategori_utama` × 11 `sub_kategori` (see [taxonomy-kpm.json](./taxonomy-kpm.json)) |
-| **Output** | `/data/merged_trends_<YYYYMMDD_HHMMSS>.json` |
+| **Max keywords** | 100 per source per scrape |
+| **Rule Filter** | Word-boundary regex against ~80 governance signals |
+| **AI Filter** | OpenRouter batch classification (never per-keyword) |
+| **Expander** | Keyword variant expansion via OpenRouter (manual trigger) |
+| **Lifecycle** | raw → filtered → fresh → expanded |
+| **API** | FastAPI REST API for Phase 2 integration |
 
 ---
 
@@ -23,13 +24,31 @@ Output: `/data/merged_trends_<YYYYMMDD_HHMMSS>.json` — schema-compliant with [
 
 ```
 keyword-scraper/
-├── main.py                   # Unified scraper — only entry point needed
-├── pyproject.toml            # Project metadata & dependencies
-├── uv.lock                   # Locked dependency tree
-├── scraped_item.schema.json  # JSON Schema for output items
-├── taxonomy-kpm.json         # Full category/sub-category definitions
-└── data/                     # Output directory (auto-created, git-ignored)
-    └── merged_trends_<timestamp>.json
+├── api/
+│   ├── main.py              # FastAPI app factory + lifespan
+│   └── routes/
+│       ├── scrape.py       # POST /scrape
+│       ├── keywords.py     # GET /keywords, DELETE /keywords/{id}
+│       ├── filter.py       # POST /keywords/filter
+│       ├── classify.py     # POST /keywords/classify
+│       └── expand.py       # POST /keywords/expand/batch
+├── pages/
+│   ├── 1_Scrape.py         # Scrape keywords from GTR + T24
+│   ├── 2a_Rule_Filter.py   # Rule-based filtering
+│   ├── 2b_AI_Filter.py     # OpenRouter AI classification
+│   ├── 3_Fresh_Keywords.py # View fresh keywords
+│   └── 4_Expand.py          # Expand keywords into variants
+├── services/
+│   ├── openrouter.py       # Batch AI classification
+│   └── expander.py         # Keyword variant expansion
+├── models/
+│   └── keyword.py          # SQLAlchemy 2.0 Keyword model
+├── database.py             # Engine, session, Base
+├── config.py               # DB URL, OpenRouter API key
+├── main.py                 # Launch FastAPI + Streamlit side-by-side
+└── keyword_scraper/
+    ├── filters.py           # Word-boundary regex rule filter
+    └── scrapers.py         # GTR + T24 scrapers (existing)
 ```
 
 ---
@@ -37,133 +56,76 @@ keyword-scraper/
 ## Setup
 
 ```bash
-# 1. Install all dependencies
+# 1. Install dependencies
 uv sync
 
 # 2. Install Playwright browser (first time only)
 uv run crawl4ai-setup
+
+# 3. Set OpenRouter API key
+export OPENROUTER_API_KEY=your-key
+
+# 4. Run
+uv run python main.py
 ```
 
-> **Note:** The mDeBERTa model (~180 MB) downloads automatically from Hugging Face on first run.
+**Or run services individually:**
+```bash
+# FastAPI (docs at http://localhost:8000/docs)
+uv run uvicorn api.main:app --port 8000
+
+# Streamlit UI
+uv run streamlit run pages/1_Scrape.py --server.port 8501
+```
 
 ---
 
-## Usage
+## Keyword Lifecycle
+
+```
+raw (scraped) → filtered (rule pass) → fresh (AI pass) → expanded (variants)
+```
+
+1. **Scrape** — Fetch trending keywords from Google Trends + Trends24 Indonesia
+2. **Rule Filter** — Word-boundary regex match against ~80 governance signals; drops keywords with no governance signal
+3. **AI Filter** — OpenRouter batch classification; keeps relevant keywords as `FRESH`
+4. **Expand** — Generate search query variants for selected keywords (triggered manually; top-5 auto-flagged as `high_trend`)
+
+**Deduplication:** Fresh/expanded keywords keep their status on re-scrape; raw/filtered keywords are re-evaluated.
+
+---
+
+## Phase 2 Integration
+
+Two REST endpoints for downstream Phase 2 scrapers:
 
 ```bash
-uv run python main.py
+# Get all fresh keywords (ready for social media scraping)
+GET /keywords/fresh
 
-# Or via the project script shorthand
-uv run scrape
-```
-
-Sample console output:
-
-```
-[GTR] Running Stage 0 filter + classification (14 raw keywords)…
-  ✗ (  4/14) SKIP [entertainment/fandom pattern]  freya jkt48
-  ✓ (  9/14) KEEP  japto soerjosoemarno kpk
-  ...
-
-[T24] Running Stage 0 filter + classification (100 raw keywords)…
-  ✗ (  6/100) SKIP [entertainment/fandom pattern]  #봄볕의따스함은알콩이전해준사랑
-  ✓ ( 13/100) KEEP  BPJS
-  ✓ ( 59/100) KEEP  Gempa
-  ...
-
-✅ Done! 79 items saved to data/merged_trends_20260313_000212.json
-   GTR  → accepted:  13  skipped:   1  (of 14)
-   T24  → accepted:  66  skipped:  34  (of 100)
-```
-
----
-
-## Classification Pipeline
-
-### Stage 0 — Relevance Gate (blocks entertainment noise)
-
-Applied before classification. A keyword is **dropped** if it matches any hard-block pattern, or if it contains **no governance/public-interest signal**.
-
-| Hard-block patterns | Example |
-|---|---|
-| Korean / Thai / Japanese Unicode | `#봄볕의따스함은알콩이전해준사랑` |
-| K-pop fandom hashtags (`#XxxDay`, `#XxxFandom` …) | `#OurHalfBeomgyuDay` |
-| K-pop group / idol name fragments (50+ names) | `ENHYPEN IS SEVEN`, `beomgyu` |
-| Sports merchandise brands | `Kelme`, `Erspo`, `Mills` |
-| Entertainment event noise | `ON AIR WITH DJ JAEMIN`, `PRESSTOUR` |
-
-Keywords that pass the block-list must also contain at least one signal from ~80 Indonesian governance/public-interest terms (e.g. `bpjs`, `gempa`, `kpk`, `apbn`, `banjir`, `pdp`, `netanyahu`, …).
-
-### Stage 1 — Rule-Based Seed Match
-
-Substring match (case-insensitive) against taxonomy seed terms. On match: label assigned instantly, `confidence_score: null`.
-
-| Code | Parent | Example seeds |
-|---|---|---|
-| `IPH` | POG | korupsi, kpk, suap, lhkpn |
-| `KLP` | POG | kebijakan, regulasi, e-government |
-| `KPM` | POG | apbn, audit bpk, kinerja menteri |
-| `KSD` | POG | judi online, hoaks, hack, phishing, scam |
-| `KBS` | ECD | bansos, pkh, blt, kemiskinan |
-| `ILT` | ECD | tol, krl, bts, fiber optik, satria |
-| `EKD` | ECD | fintech, startup, kripto, qris |
-| `KTK` | ECD | phk, umr, pengangguran, prakerja |
-| `LKS` | SEH | bpjs, wabah, pandemi, puskesmas |
-| `PSD` | SEH | sekolah, ppdb, literasi digital, beasiswa |
-| `KSB` | SEH | banjir, gempa, longsor, bencana |
-
-### Stage 2 — Zero-Shot NLI (mDeBERTa)
-
-If no rule matches: `MoritzLaurer/mDeBERTa-v3-base-mnli-xnli` classifies the keyword against all 11 label descriptions. Confidence ≥ 0.75 is reliable; below that the item is still kept but flagged `is_auto_labeled: true`. On model failure: fallback `ECD > EKD`, `confidence_score: 0.1`.
-
----
-
-## Output Schema
-
-Each item in the output JSON array conforms to [`scraped_item.schema.json`](./scraped_item.schema.json):
-
-```jsonc
-{
-  "id": "<uuid-v4>",
-  "source_platform": "GTR",          // "GTR" | "T24"
-  "keyword": "Japto Soerjosoemarno KPK",
-  "url": "https://trends.google.com/trending?geo=ID",
-  "scraped_at": "2026-03-13T00:02:12Z",
-  "trend_date": "2026-03-13",
-  "rank": 8,
-  "search_volume": null,
-  "volume_label": null,
-  "related_queries": null,
-  "geo": { "country": "ID", "region": null },
-  "kategori_utama": "POG",           // POG | ECD | SEH
-  "sub_kategori": "IPH",             // one of 11 codes
-  "sentimen": "NET",                 // POS | NEG | NET
-  "prioritas": "S",                  // T | S | R
-  "is_auto_labeled": true,
-  "confidence_score": null,          // null if rule-based
-  "ews_flag": false,
-  "ews_reason": null,
-  "raw_payload": null,
-  "created_at": "2026-03-13T00:02:12Z",
-  "updated_at": null
-}
+# Get all expanded keywords
+GET /keywords?status=expanded
 ```
 
 ---
 
 ## Configuration
 
-All tuneable constants live at the top of `main.py`:
-
-| Constant | Purpose |
-|---|---|
-| `TAXONOMY_RULES` | Seed terms per sub-category for Stage 1 |
-| `_BLOCK_PATTERNS` | Regex of hard-blocked entertainment patterns (Stage 0) |
-| `_RELEVANCE_SIGNALS` | Regex of required governance signal terms (Stage 0) |
-| `CANDIDATE_LABELS` | Label descriptions used by mDeBERTa (Stage 2) |
-| `NEGATIVE_TERMS` / `POSITIVE_TERMS` | Sentiment heuristic keywords |
-| `OUTPUT_DIR` | Output path (default: `./data`) |
+| Environment Variable | Default | Purpose |
+|---|---|---|
+| `OPENROUTER_API_KEY` | — | Required for AI filter and expander |
+| `DATABASE_URL` | `sqlite:///./keyword_scraper.db` | Change to PostgreSQL URL for production |
 
 ---
 
-**Developed by AITF UGM Tim 1 🚀**
+## Tests
+
+```bash
+uv run python -m pytest tests/ -v
+```
+
+18 tests covering models, filters, services, API, and integration.
+
+---
+
+**Developed by AITF UGM Tim 1**
