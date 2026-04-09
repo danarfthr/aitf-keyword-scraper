@@ -15,7 +15,7 @@ st.title("Scrape Keywords")
 if st.button("Run Scrape"):
     with st.spinner("Scraping Google Trends and Trends24 Indonesia..."):
         try:
-            response = requests.post(f"{API_BASE}/scrape", timeout=60)
+            response = requests.post(f"{API_BASE}/scrape", timeout=300)
             response.raise_for_status()
             result = response.json()
             st.success(f"Scrape complete!")

@@ -7,12 +7,14 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from crawl4ai import AsyncWebCrawler, BrowserConfig
 import nest_asyncio
+import asyncio
+
+nest_asyncio.apply()
 
 from keyword_scraper.scrapers import scrape_google_trends, scrape_trends24
 from database import SessionLocal
 from models.keyword import Keyword, Source, KeywordStatus
 
-nest_asyncio.apply()
 router = APIRouter()
 
 
