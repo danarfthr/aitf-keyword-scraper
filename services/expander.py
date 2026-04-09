@@ -1,8 +1,8 @@
 """
-openrouter.py
-==============
-Batch AI classification via OpenRouter API.
-Single API call for ALL keywords — never per-keyword.
+expander.py
+===========
+Keyword variant expansion via OpenRouter.
+Single batch prompt for all keywords — never per-keyword.
 """
 
 import os
@@ -11,35 +11,33 @@ import requests
 from pydantic import BaseModel
 
 
-class ClassificationResult(BaseModel):
+class ExpansionResult(BaseModel):
     keyword: str
-    relevant: bool
+    variants: list[str]
 
 
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 DEFAULT_MODEL = "google/gemma-4-26b-a4b-it:free"
-QUALITY_MODEL = "qwen/qwen3.6-plus"
 
 
-def classify_batch(keywords: list[str], model: str = DEFAULT_MODEL) -> list[ClassificationResult]:
+def expand_batch(keywords: list[str], model: str = DEFAULT_MODEL) -> list[ExpansionResult]:
     """
-    Batch-classify keywords via OpenRouter.
+    Batch-generate variants for multiple keywords via OpenRouter.
 
-    Returns a list of ClassificationResult (keyword + relevant bool).
-    Keywords that are not relevant are NOT included in Phase 2 output.
+    Returns list of ExpansionResult (keyword + list of variants).
     """
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
         raise ValueError("OPENROUTER_API_KEY environment variable is required")
 
     prompt = (
-        "Classify each keyword as relevant or not relevant for government/public interest/politics in Indonesia.\n"
-        "Relevance means: related to policy, governance, public safety, economics, or social issues.\n\n"
-        "Keywords to classify:\n"
+        "Generate search query variants for the following Indonesian keywords.\n"
+        "For each keyword, produce 3-5 relevant variant queries that Indonesian social media users might search.\n\n"
+        "Keywords:\n"
         + json.dumps(keywords, ensure_ascii=False)
         + "\n\n"
         'Output a JSON array with this exact format — no extra text:\n'
-        '{"results": [{"keyword": "keyword text", "relevant": true/false}, ...]}'
+        '{"results": [{"keyword": "original keyword", "variants": ["variant 1", "variant 2", ...]}, ...]}'
     )
 
     response = requests.post(
@@ -51,7 +49,7 @@ def classify_batch(keywords: list[str], model: str = DEFAULT_MODEL) -> list[Clas
         json={
             "model": model,
             "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.1,
+            "temperature": 0.3,
         },
         timeout=120,
     )
@@ -62,6 +60,6 @@ def classify_batch(keywords: list[str], model: str = DEFAULT_MODEL) -> list[Clas
     content = response.json()["choices"][0]["message"]["content"]
     try:
         data = json.loads(content)
-        return [ClassificationResult(**item) for item in data["results"]]
+        return [ExpansionResult(**item) for item in data["results"]]
     except (json.JSONDecodeError, KeyError) as e:
         raise RuntimeError(f"Failed to parse OpenRouter response: {e}\nContent: {content}")
