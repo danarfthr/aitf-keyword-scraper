@@ -95,7 +95,7 @@ When a new scrape runs:
 
 **Batching:** All selected keywords classified in a **single API call** using a structured prompt. Do NOT make per-keyword calls.
 
-**Model selection:** User selects from dropdown in Streamlit. Default: `anthropic/claude-3-haiku` (fast/cheap). Option for `anthropic/claude-3.5-sonnet` (higher quality).
+**Model selection:** User selects from dropdown in Streamlit. Default: `google/gemma-4-26b-a4b-it:free` (fast/cheap). Option for `qwen/qwen3.6-plus` (higher quality).
 
 **Output:** Relevant → status=`fresh`. Not relevant → keyword is deleted.
 
