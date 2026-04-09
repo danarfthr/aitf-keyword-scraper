@@ -9,8 +9,6 @@ dependencies = [
     "beautifulsoup4>=4.12",
     "lxml>=5.0",
     "pandas>=2.0",
-    "transformers>=4.40",
-    "torch>=2.2",
     "nest-asyncio>=1.6.0",
     "sqlalchemy>=2.0",
     "pydantic>=2.0",
@@ -20,8 +18,8 @@ dependencies = [
     "uvicorn>=0.30",
     "streamlit>=1.0",
     "httpx>=0.25",
+    "python-dotenv>=1.0",
 ]
 
 [project.scripts]
 scrape = "main:main"
-scrape-run = "keyword_scraper.runner:run"

@@ -1,5 +1,6 @@
 """
-POST /keywords/classify — Apply OpenRouter AI binary filter
+POST /keywords/classify — Apply OpenRouter AI binary filter.
+Non-relevant keywords are marked REJECTED (not deleted).
 """
 from fastapi import APIRouter, HTTPException
 from sqlalchemy.orm import Session
@@ -20,7 +21,7 @@ class ClassifyRequest(BaseModel):
 class ClassifyResult(BaseModel):
     total: int
     fresh: int
-    deleted: int
+    rejected: int
 
 
 @router.post("/classify", response_model=ClassifyResult)
@@ -29,26 +30,29 @@ def classify_keywords(request: ClassifyRequest):
     try:
         keywords = db.query(Keyword).filter(Keyword.id.in_(request.keyword_ids)).all()
         if not keywords:
-            raise HTTPException(status_code=404, detail="No keywords found")
+            raise HTTPException(status_code=404, detail="No keywords found for the given IDs")
 
         keyword_texts = [kw.keyword for kw in keywords]
         results = classify_batch(keyword_texts, model=request.model)
 
-        result_map = {r.keyword: r.relevant for r in results}
-        fresh = deleted = 0
+        result_map = {r.keyword.lower(): r.relevant for r in results}
+        fresh = rejected = 0
 
         for kw in keywords:
-            is_relevant = result_map.get(kw.keyword, False)
+            is_relevant = result_map.get(kw.keyword.lower(), False)
             if is_relevant:
                 kw.status = KeywordStatus.FRESH
                 kw.ready_for_scraping = True
                 fresh += 1
             else:
-                db.delete(kw)
-                deleted += 1
+                kw.status = KeywordStatus.REJECTED
+                kw.ready_for_scraping = False
+                rejected += 1
 
         db.commit()
-        return ClassifyResult(total=len(keywords), fresh=fresh, deleted=deleted)
+        return ClassifyResult(total=len(keywords), fresh=fresh, rejected=rejected)
+    except HTTPException:
+        raise
     except Exception as exc:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(exc))

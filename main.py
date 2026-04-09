@@ -8,6 +8,9 @@ Usage:
 """
 import subprocess
 import sys
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def main():
     print("Starting Keyword Scraper MVP...")
@@ -19,7 +22,7 @@ def main():
     )
 
     st_process = subprocess.Popen(
-        [sys.executable, "-m", "streamlit", "run", "pages", "--server.port", "8501"],
+        [sys.executable, "-m", "streamlit", "run", "Scrape_Keywords.py", "--server.port", "8501"],
     )
 
     try:

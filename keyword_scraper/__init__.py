@@ -1,1 +1,1 @@
-# keyword_scraper package
+# keyword_scraper package — scrapers and filters

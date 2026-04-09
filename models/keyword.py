@@ -9,11 +9,13 @@ from database import Base
 class Source(str, PyEnum):
     GTR = "GTR"
     T24 = "T24"
+    MANUAL = "MANUAL"
 
 
 class KeywordStatus(str, PyEnum):
     RAW = "raw"
     FILTERED = "filtered"
+    REJECTED = "rejected"
     FRESH = "fresh"
     EXPANDED = "expanded"
 

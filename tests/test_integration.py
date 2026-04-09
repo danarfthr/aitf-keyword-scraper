@@ -42,7 +42,11 @@ def test_full_lifecycle(reset_db, client):
     assert r.status_code == 200
     result = r.json()
     assert result["total"] == 3
-    assert result["filtered"] == 1
+    assert result["rejected"] == 1
+
+    # Rejected keywords should still exist with REJECTED status (not deleted)
+    r = client.get("/keywords?status=rejected")
+    assert len(r.json()) == 1
 
     r = client.get("/keywords/fresh")
     assert len(r.json()) == 0
