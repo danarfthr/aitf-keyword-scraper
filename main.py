@@ -16,12 +16,10 @@ def main():
 
     api_process = subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"],
-        cwd="/Users/user/aitf/keyword-scraper/.worktrees/feat-mvp",
     )
 
     st_process = subprocess.Popen(
-        [sys.executable, "-m", "streamlit", "run", "pages/1_Scrape.py", "--server.port", "8501"],
-        cwd="/Users/user/aitf/keyword-scraper/.worktrees/feat-mvp",
+        [sys.executable, "-m", "streamlit", "run", "pages", "--server.port", "8501"],
     )
 
     try:
