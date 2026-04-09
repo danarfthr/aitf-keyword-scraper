@@ -20,6 +20,7 @@ if st.button("Run Scrape"):
             result = response.json()
             st.success(f"Scrape complete!")
             st.json(result)
+            st.rerun()
         except Exception as e:
             st.error(f"Scrape failed: {e}")
 
