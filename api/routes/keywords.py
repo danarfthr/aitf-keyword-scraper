@@ -3,6 +3,7 @@ GET /keywords — List all keywords (filter by status, source)
 DELETE /keywords/{id} — Delete a keyword
 GET /keywords/fresh — List fresh keywords
 """
+from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Query, HTTPException
 from sqlalchemy.orm import Session
@@ -22,7 +23,7 @@ class KeywordResponse(BaseModel):
     source: Source
     rank: int
     status: KeywordStatus
-    scraped_at: str
+    scraped_at: datetime
     expand_trigger: Optional[str]
     parent_id: Optional[str]
     ready_for_scraping: bool
