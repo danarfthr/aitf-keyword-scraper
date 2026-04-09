@@ -17,3 +17,7 @@ data/
 
 # Hugging Face model cache
 .cache/
+
+# Claude Code
+.claude/
+.superpowers/
