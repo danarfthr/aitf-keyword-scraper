@@ -1,26 +1,7 @@
-# Python-generated files
+.env
+*.pyc
 __pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
-
-# Virtual environments
-.venv
-
-# Scraped output
-data/
-
-# macOS metadata
 .DS_Store
-
-# Hugging Face model cache
-.cache/
-
-# Claude Code
-.claude/
-.superpowers/
-
-# Git worktrees
-.worktrees/
+*.log
+.pytest_cache/
+htmlcov/
