@@ -1,0 +1,94 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: aitf-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aitf}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_in_production}
+      POSTGRES_DB: ${POSTGRES_DB:-aitf_keywords}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aitf} -d ${POSTGRES_DB:-aitf_keywords}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    container_name: aitf-api
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-aitf}:${POSTGRES_PASSWORD:-change_me_in_production}@postgres:5432/${POSTGRES_DB:-aitf_keywords}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - /tmp:/tmp
+
+  sampler:
+    build:
+      context: .
+      dockerfile: services/sampler/Dockerfile
+    container_name: aitf-sampler
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-aitf}:${POSTGRES_PASSWORD:-change_me_in_production}@postgres:5432/${POSTGRES_DB:-aitf_keywords}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - /tmp:/tmp
+
+  llm:
+    build:
+      context: .
+      dockerfile: services/llm/Dockerfile
+    container_name: aitf-llm
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-aitf}:${POSTGRES_PASSWORD:-change_me_in_production}@postgres:5432/${POSTGRES_DB:-aitf_keywords}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - /tmp:/tmp
+
+  expiry:
+    build:
+      context: .
+      dockerfile: services/expiry/Dockerfile
+    container_name: aitf-expiry
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-aitf}:${POSTGRES_PASSWORD:-change_me_in_production}@postgres:5432/${POSTGRES_DB:-aitf_keywords}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - /tmp:/tmp
+
+  demo:
+    build:
+      context: .
+      dockerfile: services/demo/Dockerfile
+    container_name: aitf-demo
+    ports:
+      - "8501:8501"
+    env_file: .env
+    environment:
+      - API_BASE_URL=http://api:8000
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  pgdata:
