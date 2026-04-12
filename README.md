@@ -1,131 +1,234 @@
-# keyword-scraper
+# AITF Keyword Manager v2
 
-Microservice-ready MVP that scrapes trending keywords from **Google Trends** and **Trends24 Indonesia**, lets users filter and validate them through rule-based and AI-powered pipelines, and expands relevant keywords into variants for downstream Phase 2 social media scraping.
+Microservice pipeline that scrapes trending keywords from Google Trends and Trends24 Indonesia, samples relevant news articles via crawler, uses OpenRouter LLM to determine government relevance, and enriches relevant keywords with expanded search terms. Output is consumed by Team 4 via REST API.
 
-**Architecture:** Two-process deployment — FastAPI (port 8000) for REST API, Streamlit (port 8501) for human users. SQLite via SQLAlchemy 2.0 for MVP; PostgreSQL swap = one `DATABASE_URL` change.
-
----
-
-## Features
-
-| | Detail |
-|---|---|
-| **Sources** | Google Trends (`GTR`) · Trends24 (`T24`) |
-| **Max keywords** | 100 per source per scrape |
-| **Rule Filter** | Word-boundary regex against ~80 governance signals |
-| **AI Filter** | OpenRouter batch classification (never per-keyword) |
-| **Expander** | Keyword variant expansion via OpenRouter (manual trigger) |
-| **Lifecycle** | raw → filtered → fresh → expanded |
-| **API** | FastAPI REST API for Phase 2 integration |
-
----
-
-## Project Structure
-
-```
-keyword-scraper/
-├── api/
-│   ├── main.py              # FastAPI app factory + lifespan
-│   └── routes/
-│       ├── scrape.py       # POST /scrape
-│       ├── keywords.py     # GET /keywords, DELETE /keywords/{id}
-│       ├── filter.py       # POST /keywords/filter
-│       ├── classify.py     # POST /keywords/classify
-│       └── expand.py       # POST /keywords/expand/batch
-├── pages/
-│   ├── 1_Scrape.py         # Scrape keywords from GTR + T24
-│   ├── 2a_Rule_Filter.py   # Rule-based filtering
-│   ├── 2b_AI_Filter.py     # OpenRouter AI classification
-│   ├── 3_Fresh_Keywords.py # View fresh keywords
-│   └── 4_Expand.py          # Expand keywords into variants
-├── services/
-│   ├── openrouter.py       # Batch AI classification
-│   └── expander.py         # Keyword variant expansion
-├── models/
-│   └── keyword.py          # SQLAlchemy 2.0 Keyword model
-├── database.py             # Engine, session, Base
-├── config.py               # DB URL, OpenRouter API key
-├── main.py                 # Launch FastAPI + Streamlit side-by-side
-└── keyword_scraper/
-    ├── filters.py           # Word-boundary regex rule filter
-    └── scrapers.py         # GTR + T24 scrapers (existing)
-```
-
----
-
-## Setup
-
-```bash
-# 1. Install dependencies
-uv sync
-
-# 2. Install Playwright browser (first time only)
-uv run crawl4ai-setup
-
-# 3. Set OpenRouter API key
-export OPENROUTER_API_KEY=your-key
-
-# 4. Run
-uv run python main.py
-```
-
-**Or run services individually:**
-```bash
-# FastAPI (docs at http://localhost:8000/docs)
-uv run uvicorn api.main:app --port 8000
-
-# Streamlit UI
-uv run streamlit run pages/1_Scrape.py --server.port 8501
-```
+**Architecture:** 5-container Docker Compose deployment (API, Sampler, LLM, Expiry, Demo) + PostgreSQL.
 
 ---
 
 ## Keyword Lifecycle
 
 ```
-raw (scraped) → filtered (rule pass) → fresh (AI pass) → expanded (variants)
+raw → news_sampled → llm_justified → enriched → expired
+                         ↓
+                      (failed → raw, auto-retry)
 ```
 
-1. **Scrape** — Fetch trending keywords from Google Trends + Trends24 Indonesia
-2. **Rule Filter** — Word-boundary regex match against ~80 governance signals; drops keywords with no governance signal
-3. **AI Filter** — OpenRouter batch classification; keeps relevant keywords as `FRESH`
-4. **Expand** — Generate search query variants for selected keywords (triggered manually; top-5 auto-flagged as `high_trend`)
-
-**Deduplication:** Fresh/expanded keywords keep their status on re-scrape; raw/filtered keywords are re-evaluated.
+1. **API + Scraper** — Triggered by Team 4, scrapes Trends24/Google Trends, inserts delta keywords as `raw`
+2. **Sampler** — Polls `status=raw`, crawls detik/kompas/tribun news, sets `news_sampled`
+3. **LLM Justifier** — Polls `status=news_sampled`, calls OpenRouter to classify relevance, sets `llm_justified`
+4. **LLM Enricher** — Polls `status=llm_justified` + `is_relevant=true`, generates expanded keywords, sets `enriched`
+5. **Expiry Job** — Cron job: expires stale enriched, expires irrelevant justified, retries failed keywords
 
 ---
 
-## Phase 2 Integration
+## Services
 
-Two REST endpoints for downstream Phase 2 scrapers:
+| Service | Port | Responsibility |
+|---------|------|----------------|
+| `api` | 8000 | FastAPI REST API + scraper as BackgroundTask |
+| `sampler` | — | Article crawling loop |
+| `llm` | — | Justifier + enricher loop |
+| `expiry` | — | APScheduler cleanup cron |
+| `demo` | 8501 | Streamlit read-only dashboard |
+
+---
+
+## Quick Start
 
 ```bash
-# Get all fresh keywords (ready for social media scraping)
-GET /keywords/fresh
+# Copy environment
+cp .env.example .env
+# Edit .env with your values (API keys, database credentials)
 
-# Get all expanded keywords
-GET /keywords?status=expanded
+# Start all services
+docker compose up -d
+
+# Verify health
+curl http://localhost:8000/pipeline/health
+
+# Trigger a scrape (requires X-API-Key)
+curl -X POST http://localhost:8000/pipeline/trigger \
+  -H "X-API-Key: your-secret-key" \
+  -H "Content-Type: application/json" \
+  -d '{"source": "all"}'
+
+# Check enriched keywords
+curl http://localhost:8000/keywords/enriched
 ```
 
 ---
 
-## Configuration
+## API Endpoints
 
-| Environment Variable | Default | Purpose |
-|---|---|---|
-| `OPENROUTER_API_KEY` | — | Required for AI filter and expander |
-| `DATABASE_URL` | `sqlite:///./keyword_scraper.db` | Change to PostgreSQL URL for production |
+**Public:**
+- `GET /pipeline/health` — Pipeline status and keyword counts
+- `GET /keywords/enriched?limit=50&offset=0` — Enriched keywords for Team 4
+- `GET /keywords/{id}` — Full keyword detail with articles, justification, enrichment
+- `GET /keywords/status/{status}` — Keywords filtered by status
+
+**Protected (requires X-API-Key):**
+- `POST /pipeline/trigger` — Trigger scrape cycle
+- `POST /pipeline/expire` — Manually run expiry passes
+- `POST /pipeline/retry-failed` — Reset all failed keywords to raw
+
+---
+
+## Local Development
+
+```bash
+# Create virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Install dependencies
+pip install -e shared/
+pip install alembic psycopg2-binary asyncpg sqlalchemy loguru fastapi uvicorn pydantic httpx beautifulsoup4 crawl4ai streamlit pytest pytest-asyncio
+
+# Set up database
+alembic upgrade head
+
+# Run individual services
+uvicorn services.api.main:app --host 127.0.0.1 --port 8000
+python services/sampler/main.py
+python services/llm/main.py
+python services/expiry/main.py
+streamlit run services/demo/app.py
+
+# Run tests
+export DATABASE_URL="postgresql+asyncpg://aitf:change_me_in_production@localhost:5432/aitf_test"
+pytest tests/ -v
+```
+
+---
+
+## Environment Variables
+
+```env
+# PostgreSQL
+DATABASE_URL=postgresql+asyncpg://aitf:change_me_in_production@localhost:5432/aitf_keywords
+DATABASE_URL_SYNC=postgresql+psycopg2://aitf:change_me_in_production@localhost:5432/aitf_keywords
+
+# OpenRouter
+OPENROUTER_API_KEY=sk-or-replace-me
+LLM_MODEL=anthropic/claude-3-haiku
+LLM_MAX_CALLS_PER_MINUTE=20
+
+# Scraper
+SCRAPE_WINDOW_MINUTES=120
+
+# Sampler
+SAMPLER_POLL_INTERVAL_SECONDS=30
+SAMPLER_BATCH_SIZE=5
+
+# LLM Service
+LLM_POLL_INTERVAL_SECONDS=30
+LLM_BATCH_SIZE=10
+
+# Expiry Job
+EXPIRY_THRESHOLD_HOURS=6
+IRRELEVANT_EXPIRY_HOURS=24
+FAILED_RETRY_MINUTES=30
+EXPIRY_CHECK_INTERVAL_MINUTES=30
+
+# API
+API_SECRET_KEY=change_me_in_production
+```
+
+---
+
+## Docker Services
+
+```bash
+# Build all images
+docker compose build
+
+# Start all services
+docker compose up -d
+
+# View logs
+docker compose logs -f api sampler llm expiry
+
+# Stop all
+docker compose down
+
+# Run migrations
+docker compose run --rm api alembic upgrade head
+```
+
+---
+
+## Team 4 Integration
+
+Team 4 consumes enriched keywords via the REST API:
+
+```bash
+# Get all enriched keywords with expanded search terms
+GET /keywords/enriched
+
+# Response shape:
+{
+  "total": 120,
+  "limit": 50,
+  "offset": 0,
+  "items": [
+    {
+      "id": 1,
+      "keyword": "kenaikan BBM",
+      "source": "trends24",
+      "rank": 3,
+      "scraped_at": "2026-04-10T08:00:00Z",
+      "expanded_keywords": ["harga BBM", "subsidi energi", "pertamina"]
+    }
+  ]
+}
+```
+
+Webhook/Scheduler integration: `POST /pipeline/trigger` with X-API-Key header.
+
+---
+
+## Project Structure
+
+```
+├── shared/
+│   └── shared/               # Pip-installable package (import: shared.shared.*)
+│       ├── constants.py      # KeywordStatus, sources, thresholds
+│       ├── db.py            # asyncpg SQLAlchemy engine
+│       └── models.py        # ORM models (Keyword, Article, Justification, Enrichment, ScrapeRun)
+├── services/
+│   ├── scraper/             # Library only (no container)
+│   │   ├── trends24.py      # Trends24 HTTP scraper
+│   │   ├── google_trends.py # Google Trends HTTP scraper
+│   │   └── delta.py         # Delta detection
+│   ├── sampler/             # Article crawler
+│   ├── llm/                 # OpenRouter justifier + enricher
+│   ├── expiry/              # APScheduler cleanup job
+│   ├── api/                 # FastAPI REST API
+│   └── demo/                # Streamlit read-only dashboard
+├── alembic/                  # Database migrations
+├── tests/                    # pytest + pytest-asyncio
+├── docker-compose.yml
+└── SPEC.md                   # Full specification document
+```
 
 ---
 
 ## Tests
 
 ```bash
-uv run python -m pytest tests/ -v
-```
+# Run all tests
+pytest tests/ -v
 
-18 tests covering models, filters, services, API, and integration.
+# 36 tests covering:
+# - Delta detection logic
+# - Body summarization
+# - URL deduplication and article capping
+# - LLM justification and enrichment
+# - 3-pass expiry job
+# - API endpoints and auth
+```
 
 ---
 
-**Developed by AITF UGM Tim 1**
+**Developed by AITF Tim 1 — Universitas Gadjah Mada**
