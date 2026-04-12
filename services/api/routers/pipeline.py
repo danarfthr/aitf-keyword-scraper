@@ -46,32 +46,32 @@ async def run_scrape_cycle(source: str, run_id: int) -> None:
             deltas = await detect_delta(all_scraped, session, window_minutes)
             log.info(f"Delta detected: {len(deltas)} new keywords")
 
-            async with session.begin():
-                for d in deltas:
-                    kw = Keyword(
-                        keyword=d["keyword"],
-                        source=d["source"],
-                        rank=d.get("rank"),
-                        status=KeywordStatus.RAW,
-                    )
-                    session.add(kw)
+            for d in deltas:
+                kw = Keyword(
+                    keyword=d["keyword"],
+                    source=d["source"],
+                    rank=d.get("rank"),
+                    status=KeywordStatus.RAW,
+                )
+                session.add(kw)
 
-                run = await session.get(ScrapeRun, run_id)
-                if run:
-                    run.status = "done"
-                    run.finished_at = func.now()
-                    run.keywords_inserted = len(deltas)
+            run = await session.get(ScrapeRun, run_id)
+            if run:
+                run.status = "done"
+                run.finished_at = func.now()
+                run.keywords_inserted = len(deltas)
+            await session.commit()
 
         log.info(f"Scrape cycle complete for run_id={run_id}")
     except Exception as e:
         log.error(f"Scrape cycle failed for run_id={run_id}: {e}")
         try:
             async with get_session() as session:
-                async with session.begin():
-                    run = await session.get(ScrapeRun, run_id)
-                    if run:
-                        run.status = "failed"
-                        run.finished_at = func.now()
+                run = await session.get(ScrapeRun, run_id)
+                if run:
+                    run.status = "failed"
+                    run.finished_at = func.now()
+                await session.commit()
         except Exception:
             pass
 

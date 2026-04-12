@@ -10,7 +10,8 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel sqlalchemy[asyncio
 
 COPY shared /app/shared
 
-RUN pip install --no-cache-dir loguru fastapi "uvicorn[standard]" pydantic httpx beautifulsoup4 crawl4ai lxml pandas html5lib
+RUN pip install --no-cache-dir loguru fastapi "uvicorn[standard]" pydantic httpx beautifulsoup4 crawl4ai lxml pandas html5lib && \
+    playwright install chromium --with-deps
 
 COPY services/scraper /app/services/scraper
 COPY services/api /app/services/api
