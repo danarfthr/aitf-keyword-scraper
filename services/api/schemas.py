@@ -1,0 +1,79 @@
+"""Pydantic schemas for API request/response models."""
+
+from pydantic import BaseModel
+from typing import Optional
+
+
+class TriggerRequest(BaseModel):
+    source: str  # "trends24", "google_trends", or "all"
+
+
+class TriggerResponse(BaseModel):
+    triggered: bool
+    scrape_run_id: Optional[int] = None
+    message: str
+
+
+class ExpireResponse(BaseModel):
+    triggered: bool
+    message: str
+
+
+class RetryFailedResponse(BaseModel):
+    reset_count: int
+
+
+class HealthResponse(BaseModel):
+    counts: dict
+    last_scrape: Optional[dict]
+
+
+class EnrichedKeywordItem(BaseModel):
+    id: int
+    keyword: str
+    source: str
+    rank: Optional[int]
+    scraped_at: str
+    expanded_keywords: list[str]
+
+
+class EnrichedListResponse(BaseModel):
+    total: int
+    limit: int
+    offset: int
+    items: list[EnrichedKeywordItem]
+
+
+class ArticleItem(BaseModel):
+    id: int
+    source_site: str
+    url: str
+    title: Optional[str]
+    crawled_at: str
+
+
+class JustificationItem(BaseModel):
+    is_relevant: bool
+    justification: Optional[str]
+    llm_model: str
+    processed_at: str
+
+
+class EnrichmentItem(BaseModel):
+    expanded_keywords: list[str]
+    llm_model: str
+    processed_at: str
+
+
+class KeywordDetailResponse(BaseModel):
+    id: int
+    keyword: str
+    source: str
+    rank: Optional[int]
+    status: str
+    failure_reason: Optional[str]
+    scraped_at: str
+    updated_at: str
+    articles: list[ArticleItem]
+    justification: Optional[JustificationItem]
+    enrichment: Optional[EnrichmentItem]
