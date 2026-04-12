@@ -35,6 +35,7 @@ class EnrichedKeywordItem(BaseModel):
     rank: Optional[int]
     scraped_at: str
     expanded_keywords: list[str]
+    is_relevant: Optional[bool] = None  # Only populated when include_relevant=true on llm_justified
 
 
 class EnrichedListResponse(BaseModel):
@@ -77,3 +78,26 @@ class KeywordDetailResponse(BaseModel):
     articles: list[ArticleItem]
     justification: Optional[JustificationItem]
     enrichment: Optional[EnrichmentItem]
+
+
+# --- Stuck Keywords & Throughput ---
+
+class StuckAlert(BaseModel):
+    level: str  # "critical" | "warning" | "info"
+    status: str
+    count: int
+    oldest_seconds: int
+    message: str
+
+
+class ThroughputMetrics(BaseModel):
+    keywords_per_minute: float
+    avg_cycle_duration_seconds: float
+    total_runs_24h: int
+    total_keywords_24h: int
+
+
+class StuckKeywordsResponse(BaseModel):
+    stuck_keywords: list[StuckAlert]
+    throughput: ThroughputMetrics
+    stale_threshold_seconds: int

@@ -19,6 +19,9 @@ from ..schemas import (
     ExpireResponse,
     RetryFailedResponse,
     HealthResponse,
+    StuckKeywordsResponse,
+    StuckAlert,
+    ThroughputMetrics,
 )
 
 router = APIRouter()
@@ -121,6 +124,108 @@ async def get_pipeline_health():
             }
 
         return HealthResponse(counts=counts, last_scrape=last_scrape)
+
+
+# Threshold in seconds beyond which a keyword in a given status is considered "stuck"
+STALE_THRESHOLD_SECONDS = int(os.environ.get("STALE_THRESHOLD_SECONDS", "1800"))  # 30 min default
+
+
+@router.get("/stuck", response_model=StuckKeywordsResponse)
+async def get_stuck_keywords():
+    """
+    GET /pipeline/stuck — Returns stuck keywords and throughput metrics.
+
+    A keyword is "stuck" when it has been in a non-terminal status for longer
+    than STALE_THRESHOLD_SECONDS without progressing to the next stage.
+    Terminal statuses: enriched, expired, failed
+    """
+    async with get_session() as session:
+        now = datetime.utcnow()
+        stuck_alerts: list[StuckAlert] = []
+
+        # Non-terminal statuses that should progress
+        non_terminal = [
+            KeywordStatus.RAW,
+            KeywordStatus.NEWS_SAMPLED,
+            KeywordStatus.LLM_JUSTIFIED,
+        ]
+
+        for status in non_terminal:
+            # Find keywords in this status longer than threshold
+            stale_cutoff = now - timedelta(seconds=STALE_THRESHOLD_SECONDS)
+            stmt = (
+                select(Keyword)
+                .where(Keyword.status == status)
+                .where(Keyword.updated_at < stale_cutoff)
+            )
+            result = await session.execute(stmt)
+            stuck_kws = result.scalars().all()
+
+            if stuck_kws:
+                oldest = max(kw.updated_at for kw in stuck_kws)
+                oldest_seconds = int((now - oldest).total_seconds())
+
+                if oldest_seconds > STALE_THRESHOLD_SECONDS * 3:
+                    level = "critical"
+                elif oldest_seconds > STALE_THRESHOLD_SECONDS * 2:
+                    level = "warning"
+                else:
+                    level = "info"
+
+                stuck_alerts.append(
+                    StuckAlert(
+                        level=level,
+                        status=status,
+                        count=len(stuck_kws),
+                        oldest_seconds=oldest_seconds,
+                        message=f"{len(stuck_kws)} keywords stuck in '{status}' for {oldest_seconds // 60}+ min",
+                    )
+                )
+
+        # Throughput metrics from last 24h
+        cutoff_24h = now - timedelta(hours=24)
+        runs_stmt = (
+            select(ScrapeRun)
+            .where(ScrapeRun.started_at >= cutoff_24h)
+            .order_by(ScrapeRun.started_at.desc())
+        )
+        runs_result = await session.execute(runs_stmt)
+        runs = runs_result.scalars().all()
+
+        total_runs = len(runs)
+        total_keywords = sum(r.keywords_inserted or 0 for r in runs)
+
+        # keywords_per_minute: based on last completed run with keywords_inserted
+        keywords_per_minute = 0.0
+        avg_cycle_duration = 0.0
+        completed_runs = [r for r in runs if r.status == "done" and r.finished_at]
+        if completed_runs:
+            durations = [
+                (r.finished_at - r.started_at).total_seconds()
+                for r in completed_runs
+                if r.started_at and r.finished_at
+            ]
+            if durations:
+                avg_cycle_duration = sum(durations) / len(durations)
+            # Rate based on last run's keywords_inserted over its duration
+            last = completed_runs[0]
+            if last.started_at and last.finished_at:
+                dur = (last.finished_at - last.started_at).total_seconds()
+                if dur > 0:
+                    keywords_per_minute = (last.keywords_inserted or 0) / (dur / 60)
+
+        throughput = ThroughputMetrics(
+            keywords_per_minute=round(keywords_per_minute, 2),
+            avg_cycle_duration_seconds=round(avg_cycle_duration, 1),
+            total_runs_24h=total_runs,
+            total_keywords_24h=total_keywords,
+        )
+
+        return StuckKeywordsResponse(
+            stuck_keywords=stuck_alerts,
+            throughput=throughput,
+            stale_threshold_seconds=STALE_THRESHOLD_SECONDS,
+        )
 
 
 @router.post("/trigger", status_code=202, response_model=TriggerResponse)

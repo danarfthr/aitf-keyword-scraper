@@ -102,7 +102,7 @@ All read from `.env` via `python-dotenv`. Never hardcode. Key vars:
 │   ├── llm/             # OpenRouter justifier + enricher
 │   ├── expiry/          # APScheduler cleanup job
 │   ├── api/             # FastAPI REST API
-│   └── demo/            # Streamlit read-only dashboard
+│   └── demo/            # Streamlit read-only dashboard (radio-button nav via dashboard_pages/)
 │
 ├── alembic/              # Database migrations
 │   └── versions/
@@ -128,6 +128,6 @@ All read from `.env` via `python-dotenv`. Never hardcode. Key vars:
 
 ## Git Workflow
 
-- Branch: `feat/v2-pipeline` for all work
+- Branch: `streamlit-revamp` for current work (see `git branch` for active branch)
 - Commit convention: `<scope>: <description>` (scopes: schema, shared, scraper, sampler, llm, expiry, api, demo, infra, tests)
-- All commits go to `feat/v2-pipeline`, then PR to `master`
+- All commits go to feature branches, then PR to `master`
