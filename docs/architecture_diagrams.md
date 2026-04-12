@@ -126,38 +126,29 @@ graph TB
 stateDiagram-v2
     [*] --> raw : scraper inserts new keyword
 
-    raw --> news_sampled : sampler crawls articles\nfrom detik/kompas/tribun
+    raw --> news_sampled : sampler crawls articles
+    news_sampled --> llm_justified : justifier (OpenRouter)
+    llm_justified --> enriched : enricher (is_relevant=true)
+    llm_justified --> expired : expiry job (24h, is_relevant=false)
+    enriched --> expired : expiry job (stale > 6h)
 
-    news_sampled --> llm_justified : justifier (OpenRouter)\nreturns {is_relevant, justification}
-
-    llm_justified --> enriched : enricher (OpenRouter)\nkeyword is relevant (is_relevant=true)
-
-    llm_justified --> expired : expiry job (24h)\nis_relevant=false
-
-    enriched --> expired : expiry job\nstale > EXPIRY_THRESHOLD_HOURS (6h)
-
-    %% Failed retry path
-    state failed {
-        [*] --> failed : LLM permanent failure\n(3 retries exhausted)
-        failed --> raw : expiry job retry\n(FAILED_RETRY_MINUTES=30)
+    state failed_state {
+        [*] --> failed : LLM error (3 retries exhausted)
+        failed --> raw : expiry retry (30 min)
         failed --> [*]
     }
 
-    enriched --> [*]
-    llm_justified --> [*]
-    raw --> [*] : (never expires, waits for sampler)
+    enriched --> failed_state : LLM permanent failure
+    news_sampled --> failed_state : LLM permanent failure
 
     note right of enriched
         Only relevant keywords
         proceed to enrichment.
-        Irrelevant keywords skip
-        this state entirely.
     end note
 
-    note right of failed
+    note right of failed_state
         Auto-retried every 30 min.
-        failure_reason preserved
-        for debugging.
+        failure_reason preserved.
     end note
 ```
 
@@ -228,25 +219,21 @@ erDiagram
 
 ```mermaid
 sequenceDiagram
-    participant S as Service<br/>(Sampler/LLM/Expiry)
+    participant S as Service
     participant PG as PostgreSQL
-    participant HB as Heartbeat File
+    participant HB as Heartbeat
 
-    loop Every poll interval (30s for Sampler/LLM, 30min for Expiry)
+    loop Every poll interval
         S->>PG: SELECT ... WHERE status=X
-            WITH FOR UPDATE SKIP LOCKED
+        Note over PG: FOR UPDATE SKIP LOCKED
         PG->>S: N keyword rows (locked)
         S->>S: Process each keyword
         S->>PG: UPDATE keywords SET status=Y
-        S->>HB: Write timestamp (heartbeat)
+        S->>HB: Write timestamp
     end
 
-    Note over S,PG: SKIP LOCKED ensures no two instances<br/>process the same keyword simultaneously
-
-    loop Next poll interval
-        S->>S: Sleep POLL_INTERVAL_SECONDS
-        S->>PG: SELECT ... WHERE status=X
-    end
+    Note over S,PG: SKIP LOCKED prevents race conditions
+    Note over S,PG: Multiple instances can run safely
 ```
 
 ---
