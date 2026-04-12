@@ -124,31 +124,21 @@ graph TB
 
 ```mermaid
 stateDiagram-v2
-    [*] --> raw : scraper inserts new keyword
-
+    [*] --> raw
     raw --> news_sampled : sampler crawls articles
-    news_sampled --> llm_justified : justifier (OpenRouter)
-    llm_justified --> enriched : enricher (is_relevant=true)
-    llm_justified --> expired : expiry job (24h, is_relevant=false)
-    enriched --> expired : expiry job (stale > 6h)
+    news_sampled --> llm_justified : justifier classifies
+    llm_justified --> enriched : is_relevant=true
+    llm_justified --> expired : is_relevant=false (24h)
+    enriched --> expired : stale > 6h
+    enriched --> failed_keyword : LLM permanent failure
+    news_sampled --> failed_keyword : LLM permanent failure
+    failed_keyword --> raw : expiry retry (30 min)
 
-    state failed_state {
-        [*] --> failed : LLM error (3 retries exhausted)
-        failed --> raw : expiry retry (30 min)
-        failed --> [*]
-    }
-
-    enriched --> failed_state : LLM permanent failure
-    news_sampled --> failed_state : LLM permanent failure
-
-    note right of enriched
-        Only relevant keywords
-        proceed to enrichment.
-    end note
-
-    note right of failed_state
-        Auto-retried every 30 min.
-        failure_reason preserved.
+    note right of raw
+        Status values:
+        raw, news_sampled,
+        llm_justified,
+        enriched, expired, failed
     end note
 ```
 
