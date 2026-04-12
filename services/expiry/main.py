@@ -94,19 +94,20 @@ async def run_expiry_job():
         pass
 
 
-def main():
+async def main_async():
     logger.info(f"Expiry service started. Check interval: {EXPIRY_CHECK_INTERVAL_MINUTES} minutes")
     scheduler = AsyncIOScheduler()
     scheduler.add_job(run_expiry_job, 'interval', minutes=EXPIRY_CHECK_INTERVAL_MINUTES, next_run_time=datetime.now())
+    scheduler.start()
     
-    loop = asyncio.get_event_loop()
     try:
-        scheduler.start()
-        loop.run_forever()
-    except (KeyboardInterrupt, SystemExit):
+        # Keep running until cancelled
+        while True:
+            await asyncio.sleep(3600)
+    except (KeyboardInterrupt, SystemExit, asyncio.CancelledError):
         pass
     finally:
-        scheduler.shutdown()
+        scheduler.shutdown(wait=False)
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main_async())
