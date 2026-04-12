@@ -206,7 +206,9 @@ Webhook/Scheduler integration: `POST /pipeline/trigger` with X-API-Key header.
 │   ├── expiry/              # APScheduler cleanup job
 │   ├── api/                 # FastAPI REST API
 │   └── demo/                # Streamlit read-only dashboard
+│       └── dashboard_pages/ # P01–P05 Streamlit pages (radio-button nav)
 ├── alembic/                  # Database migrations
+├── docs/                     # Architecture diagrams (Mermaid.js)
 ├── tests/                    # pytest + pytest-asyncio
 ├── docker-compose.yml
 └── SPEC.md                   # Full specification document
@@ -220,14 +222,32 @@ Webhook/Scheduler integration: `POST /pipeline/trigger` with X-API-Key header.
 # Run all tests
 pytest tests/ -v
 
-# 36 tests covering:
+# 38 tests covering:
 # - Delta detection logic
 # - Body summarization
 # - URL deduplication and article capping
 # - LLM justification and enrichment
 # - 3-pass expiry job
 # - API endpoints and auth
+# - Streamlit demo dashboard
 ```
+
+---
+
+## Architecture
+
+See [docs/architecture_diagrams.md](docs/architecture_diagrams.md) for 11 Mermaid.js diagrams covering:
+- System architecture (C4-style container diagram)
+- Keyword lifecycle state machine
+- Database ER diagram (5 tables)
+- Polling query pattern (SELECT FOR UPDATE SKIP LOCKED)
+- API endpoint flow
+- Sampler data flow
+- LLM service (justifier + enricher) flow
+- Expiry service three-pass flow
+- Scraper delta detection flow
+- Streamlit demo dashboard structure
+- Complete end-to-end data flow
 
 ---
 
