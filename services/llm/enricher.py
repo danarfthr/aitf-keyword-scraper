@@ -58,6 +58,9 @@ async def enrich_keyword(
 
     # Extract source article IDs representing the context we sent
     source_article_ids = [article.id for article in articles if article.id]
+    
+    if not expanded_keywords:
+        expanded_keywords = [keyword.keyword]
 
     # Insert KeywordEnrichment
     stmt = insert(KeywordEnrichment).values(

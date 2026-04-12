@@ -49,6 +49,10 @@ class Keyword(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    
+    articles: Mapped[list["Article"]] = relationship(
+        "Article", back_populates="keyword", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         Index("idx_keywords_status", "status"),
@@ -74,6 +78,8 @@ class Article(Base):
     crawled_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    
+    keyword: Mapped["Keyword"] = relationship("Keyword", back_populates="articles")
 
     __table_args__ = (
         Index("idx_articles_keyword_id", "keyword_id"),
