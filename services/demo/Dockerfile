@@ -4,7 +4,7 @@ WORKDIR /app
 
 ENV PYTHONPATH=/app
 
-RUN pip install --no-cache-dir streamlit httpx loguru
+RUN pip install --no-cache-dir streamlit streamlit-autorefresh httpx loguru pandas
 
 COPY services/demo /app/
 
