@@ -22,35 +22,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Key Commands
 
 ```bash
-# Local development
+# Virtual environment
 source .venv/bin/activate
 
-# Database migrations (requires DATABASE_URL_SYNC)
+# Database migrations (first time: alembic init alembic, then edit alembic/env.py first)
 alembic revision --autogenerate -m "description"
 alembic upgrade head
 
-# Run services locally
+# Run single service
 uvicorn services.api.main:app --host 127.0.0.1 --port 8000
 python services/sampler/main.py
 python services/llm/main.py
 python services/expiry/main.py
 
-# Run tests
+# Run tests (all or single)
 pytest tests/ -v
+pytest tests/test_scraper.py::test_trends24_returns_list -v
 
 # Docker
 docker compose build
 docker compose up -d
 docker compose logs <service>
-
-# Smoke tests (root level)
-python test_scrapers.py
-python test_sampler_smoke.py
-python test_llm_client_smoke.py
-python test_llm_justifier_smoke.py
-python test_llm_enricher_smoke.py
-python test_llm_poll_smoke.py
-python test_expiry_smoke.py
 ```
 
 ## Critical Patterns
@@ -83,6 +75,13 @@ All read from `.env` via `python-dotenv`. Never hardcode. Key vars:
 - `DATABASE_URL`, `DATABASE_URL_SYNC`
 - `OPENROUTER_API_KEY`, `LLM_MODEL`
 - `API_SECRET_KEY` (for X-API-Key header auth)
+
+### Alembic Setup
+`alembic/env.py` must:
+- Read `DATABASE_URL_SYNC` (psycopg2) from environment
+- Import `Base` from `shared.shared.models`
+- Set `target_metadata = Base.metadata`
+- Use synchronous psycopg2, not asyncpg
 
 ## Directory Structure
 
@@ -125,6 +124,22 @@ All read from `.env` via `python-dotenv`. Never hardcode. Key vars:
 - `POST /pipeline/trigger` — Trigger scrape cycle (requires X-API-Key)
 - `GET /keywords/enriched` — Enriched keywords for Team 4 (public)
 - `GET /keywords/{id}` — Full keyword detail (public)
+
+## Alembic Migrations
+
+Alembic manages all schema changes. Never run raw SQL for migrations.
+
+```bash
+# Initial setup (one-time)
+alembic init alembic
+# Edit alembic/env.py: import Base from shared.shared.models, set target_metadata
+alembic revision --autogenerate -m "initial schema"
+alembic upgrade head
+
+# Future changes
+alembic revision --autogenerate -m "description"
+alembic upgrade head
+```
 
 ## Git Workflow
 

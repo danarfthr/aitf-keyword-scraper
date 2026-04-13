@@ -2,7 +2,7 @@
 
 Microservice pipeline that scrapes trending keywords from Google Trends and Trends24 Indonesia, samples relevant news articles via crawler, uses OpenRouter LLM to determine government relevance, and enriches relevant keywords with expanded search terms. Output is consumed by Team 4 via REST API.
 
-**Architecture:** 5-container Docker Compose deployment (API, Sampler, LLM, Expiry, Demo) + PostgreSQL.
+**Architecture:** 5-service Docker Compose deployment (API, Sampler, LLM, Expiry, Demo) + PostgreSQL.
 
 ---
 
@@ -19,18 +19,6 @@ raw → news_sampled → llm_justified → enriched → expired
 3. **LLM Justifier** — Polls `status=news_sampled`, calls OpenRouter to classify relevance, sets `llm_justified`
 4. **LLM Enricher** — Polls `status=llm_justified` + `is_relevant=true`, generates expanded keywords, sets `enriched`
 5. **Expiry Job** — Cron job: expires stale enriched, expires irrelevant justified, retries failed keywords
-
----
-
-## Services
-
-| Service | Port | Responsibility |
-|---------|------|----------------|
-| `api` | 8000 | FastAPI REST API + scraper as BackgroundTask |
-| `sampler` | — | Article crawling loop |
-| `llm` | — | Justifier + enricher loop |
-| `expiry` | — | APScheduler cleanup cron |
-| `demo` | 8501 | Streamlit read-only dashboard |
 
 ---
 
@@ -59,18 +47,15 @@ curl http://localhost:8000/keywords/enriched
 
 ---
 
-## API Endpoints
+## Services
 
-**Public:**
-- `GET /pipeline/health` — Pipeline status and keyword counts
-- `GET /keywords/enriched?limit=50&offset=0` — Enriched keywords for Team 4
-- `GET /keywords/{id}` — Full keyword detail with articles, justification, enrichment
-- `GET /keywords/status/{status}` — Keywords filtered by status
-
-**Protected (requires X-API-Key):**
-- `POST /pipeline/trigger` — Trigger scrape cycle
-- `POST /pipeline/expire` — Manually run expiry passes
-- `POST /pipeline/retry-failed` — Reset all failed keywords to raw
+| Service | Port | Responsibility |
+|---------|------|----------------|
+| `api` | 8000 | FastAPI REST API + scraper as BackgroundTask |
+| `sampler` | — | Article crawling loop (polling `status=raw`) |
+| `llm` | — | Justifier + enricher loop (polling `status=news_sampled`, `status=llm_justified`) |
+| `expiry` | — | APScheduler 3-pass cleanup cron |
+| `demo` | 8501 | Streamlit read-only dashboard (calls API only, no direct DB) |
 
 ---
 
@@ -85,7 +70,10 @@ source .venv/bin/activate
 pip install -e shared/
 pip install alembic psycopg2-binary asyncpg sqlalchemy loguru fastapi uvicorn pydantic httpx beautifulsoup4 crawl4ai streamlit pytest pytest-asyncio
 
-# Set up database
+# Set up Alembic (one-time)
+alembic init alembic
+# Edit alembic/env.py to import Base from shared.shared.models
+alembic revision --autogenerate -m "initial schema"
 alembic upgrade head
 
 # Run individual services
@@ -98,7 +86,23 @@ streamlit run services/demo/app.py
 # Run tests
 export DATABASE_URL="postgresql+asyncpg://aitf:change_me_in_production@localhost:5432/aitf_test"
 pytest tests/ -v
+pytest tests/test_scraper.py::test_trends24_returns_list -v  # single test
 ```
+
+---
+
+## API Endpoints
+
+**Public (no auth):**
+- `GET /pipeline/health` — Pipeline status and keyword counts by status
+- `GET /keywords/enriched?limit=50&offset=0` — Enriched keywords for Team 4
+- `GET /keywords/{id}` — Full keyword detail with articles, justification, enrichment
+- `GET /keywords/status/{status}` — Keywords filtered by status (raw, news_sampled, llm_justified, enriched, expired, failed)
+
+**Protected (requires X-API-Key header):**
+- `POST /pipeline/trigger` — Trigger scrape cycle (idempotent: returns 409 if already running)
+- `POST /pipeline/expire` — Manually run expiry passes
+- `POST /pipeline/retry-failed` — Reset all failed keywords to raw
 
 ---
 
