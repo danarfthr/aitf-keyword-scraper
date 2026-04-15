@@ -2,7 +2,7 @@
 
 Microservice pipeline that scrapes trending keywords from Google Trends and Trends24 Indonesia, samples relevant news articles via crawler, uses OpenRouter LLM to determine government relevance, and enriches relevant keywords with expanded search terms. Output is consumed by Team 4 via REST API.
 
-**Architecture:** 5-service Docker Compose deployment (API, Sampler, LLM, Expiry, Demo) + PostgreSQL.
+**Architecture:** 6-service Docker Compose deployment (API, Scraper, Sampler, LLM, Expiry, Demo) + PostgreSQL.
 
 ---
 
@@ -14,7 +14,7 @@ raw → news_sampled → llm_justified → enriched → expired
                       (failed → raw, auto-retry)
 ```
 
-1. **API + Scraper** — Triggered by Team 4, scrapes Trends24/Google Trends, inserts delta keywords as `raw`
+1. **API** — `POST /pipeline/trigger` creates a ScrapeRun row; **Scraper** polls and executes it, scraping Trends24/Google Trends and inserting delta keywords as `raw`
 2. **Sampler** — Polls `status=raw`, crawls detik/kompas/tribun news, sets `news_sampled`
 3. **LLM Justifier** — Polls `status=news_sampled`, calls OpenRouter to classify relevance, sets `llm_justified`
 4. **LLM Enricher** — Polls `status=llm_justified` + `is_relevant=true`, generates expanded keywords, sets `enriched`
@@ -51,8 +51,9 @@ curl http://localhost:8000/keywords/enriched
 
 | Service | Port | Responsibility |
 |---------|------|----------------|
-| `api` | 8000 | FastAPI REST API + scraper as BackgroundTask |
-| `sampler` | — | Article crawling loop (polling `status=raw`) |
+| `api` | 8000 | FastAPI REST API — creates ScrapeRun rows, exposes keyword endpoints |
+| `scraper` | — | Polls `ScrapeRun` table, scrapes Trends24/Google Trends, inserts delta keywords |
+| `sampler` | — | Article crawling loop via Crawl4AI (headless Chromium) polling `status=raw` |
 | `llm` | — | Justifier + enricher loop (polling `status=news_sampled`, `status=llm_justified`) |
 | `expiry` | — | APScheduler 3-pass cleanup cron |
 | `demo` | 8501 | Streamlit read-only dashboard (calls API only, no direct DB) |
@@ -68,7 +69,8 @@ source .venv/bin/activate
 
 # Install dependencies
 pip install -e shared/
-pip install alembic psycopg2-binary asyncpg sqlalchemy loguru fastapi uvicorn pydantic httpx beautifulsoup4 crawl4ai streamlit pytest pytest-asyncio
+pip install alembic psycopg2-binary asyncpg sqlalchemy loguru fastapi uvicorn pydantic httpx crawl4ai streamlit pytest pytest-asyncio
+playwright install chromium --with-deps  # required by sampler
 
 # Set up Alembic (one-time)
 alembic init alembic
@@ -77,6 +79,7 @@ alembic revision --autogenerate -m "initial schema"
 alembic upgrade head
 
 # Run individual services
+python services/scraper/main.py
 uvicorn services.api.main:app --host 127.0.0.1 --port 8000
 python services/sampler/main.py
 python services/llm/main.py
@@ -100,8 +103,8 @@ pytest tests/test_scraper.py::test_trends24_returns_list -v  # single test
 - `GET /keywords/status/{status}` — Keywords filtered by status (raw, news_sampled, llm_justified, enriched, expired, failed)
 
 **Protected (requires X-API-Key header):**
-- `POST /pipeline/trigger` — Trigger scrape cycle (idempotent: returns 409 if already running)
-- `POST /pipeline/expire` — Manually run expiry passes
+- `POST /pipeline/trigger` — Enqueue scrape job for Scraper service (idempotent: returns 409 if already running)
+- `POST /pipeline/expire` — Informational; expiry runs on 30-min cron automatically
 - `POST /pipeline/retry-failed` — Reset all failed keywords to raw
 
 ---
@@ -116,12 +119,15 @@ DATABASE_URL_SYNC=postgresql+psycopg2://aitf:change_me_in_production@localhost:5
 # OpenRouter
 OPENROUTER_API_KEY=sk-or-replace-me
 LLM_MODEL=anthropic/claude-3-haiku
-LLM_MAX_CALLS_PER_MINUTE=20
+LLM_MAX_CALLS_PER_MINUTE=10
 
 # Scraper
 SCRAPE_WINDOW_MINUTES=120
 
-# Sampler
+# Sampler (optional proxy for Crawl4AI — bypasses Cloudflare on tribun/kompas)
+CRAWLER_PROXY_URL=        # e.g. http://proxy.example.com:8080
+CRAWLER_PROXY_USER=
+CRAWLER_PROXY_PASS=
 SAMPLER_POLL_INTERVAL_SECONDS=30
 SAMPLER_BATCH_SIZE=5
 
@@ -151,7 +157,7 @@ docker compose build
 docker compose up -d
 
 # View logs
-docker compose logs -f api sampler llm expiry
+docker compose logs -f api scraper sampler llm expiry
 
 # Stop all
 docker compose down
@@ -201,11 +207,12 @@ Webhook/Scheduler integration: `POST /pipeline/trigger` with X-API-Key header.
 │       ├── db.py            # asyncpg SQLAlchemy engine
 │       └── models.py        # ORM models (Keyword, Article, Justification, Enrichment, ScrapeRun)
 ├── services/
-│   ├── scraper/             # Library only (no container)
+│   ├── scraper/             # Standalone polling service (polls ScrapeRun table)
 │   │   ├── trends24.py      # Trends24 HTTP scraper
 │   │   ├── google_trends.py # Google Trends HTTP scraper
-│   │   └── delta.py         # Delta detection
-│   ├── sampler/             # Article crawler
+│   │   ├── delta.py         # Delta detection
+│   │   └── main.py          # Entry point
+│   ├── sampler/             # Article crawler (Crawl4AI headless Chromium)
 │   ├── llm/                 # OpenRouter justifier + enricher
 │   ├── expiry/              # APScheduler cleanup job
 │   ├── api/                 # FastAPI REST API
