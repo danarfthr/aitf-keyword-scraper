@@ -85,7 +85,3 @@ elif selected_name == "Enriched Keywords":
 elif selected_name == "Failed Keywords":
     from dashboard_pages import p05_failed_keywords as m
     m.render()
-
-# ── Footer ───────────────────────────────────────────────────────────────────
-st.sidebar.markdown("---")
-st.sidebar.caption("Data refreshes automatically every 30s")

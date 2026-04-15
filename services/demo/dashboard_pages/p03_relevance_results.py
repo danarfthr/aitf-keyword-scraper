@@ -29,6 +29,7 @@ DATE_PRESETS = {
 def render():
     inject_theme()
     st.title("Relevance Results")
+    st.caption("LLM decision on whether each scraped keyword is relevant to Indonesian government/news context. Filter by relevance to focus on actionable keywords.")
 
     # ── Filters ────────────────────────────────────────────────────────────────
     c_relevance, c_date, c_src = st.columns([1, 2, 1])
@@ -77,7 +78,7 @@ def render():
     s1.metric("Total Justified", total)
     s2.metric("Relevant", relevant_count)
     s3.metric("Not Relevant", not_relevant_count)
-    s4.metric("Relevance Rate", f"{rate:.0f}%")
+    s4.metric("Relevance Rate", f"{rate:.0f}%", help="Share of justified keywords the LLM marked relevant. Calculated as relevant ÷ (relevant + not relevant).")
 
     st.divider()
 

@@ -12,6 +12,15 @@ from dashboard_pages._api import get_keyword_detail, format_wib
 from dashboard_pages._theme import inject_theme, COLORS, STATUS_COLORS, RELEVANCE_COLORS, SOURCE_COLORS
 from dashboard_pages.components._status_badge import render_status_badge, render_source_badge
 
+_STATUS_HINTS = {
+    "raw": "Scraped from Google Trends or Trends24 — awaiting news sampling.",
+    "news_sampled": "News articles sampled from detik/kompas/tribun — awaiting LLM justification.",
+    "llm_justified": "LLM assessed government relevance — awaiting enrichment if is_relevant=true.",
+    "enriched": "Enrichment complete — keyword is ready for Team 4.",
+    "failed": "LLM processing failed — will auto-retry after 30 min cooldown.",
+    "expired": "No longer trending — archived after 24h of inactivity.",
+}
+
 
 def render_keyword_detail_expander(keyword_id: int, keyword_label: str) -> None:
     """Lazy-load and render full keyword detail on expand."""
@@ -58,6 +67,7 @@ def _render_overview(detail) -> None:
     st.markdown(f"**Scraped at:** `{format_wib(detail.scraped_at)}`")
     st.markdown(f"**Last updated:** `{format_wib(detail.updated_at)}`")
     st.markdown(f"**Status:** {render_status_badge(detail.status)}")
+    st.caption(_STATUS_HINTS.get(detail.status, ""))
     if detail.failure_reason:
         st.error(f"**Failure:** {detail.failure_reason}")
 

@@ -29,6 +29,7 @@ DATE_PRESETS = {
 def render():
     inject_theme()
     st.title("Enriched Keywords")
+    st.caption("Final output — LLM-generated keyword expansions for Team 4. Each enriched keyword includes related search terms the LLM derived from the original trending keyword.")
 
     # ── Filters ────────────────────────────────────────────────────────────────
     c_src, c_date, c_search = st.columns([1, 2, 2])

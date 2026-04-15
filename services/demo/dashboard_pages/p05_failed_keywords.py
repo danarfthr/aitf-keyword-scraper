@@ -24,8 +24,7 @@ RETRY_COOLDOWN_SECONDS = 30 * 60  # 30 minutes
 def render():
     inject_theme()
     st.title("Failed Keywords")
-
-    # Retry now button (requires API key — shows warning if not configured)
+    st.caption("Keywords that failed LLM processing — auto-retry after 30 min cooldown. Persistent failures may indicate an API or scraper issue.")
     st.button("Retry Now", type="secondary")
 
     # ── Fetch ─────────────────────────────────────────────────────────────────

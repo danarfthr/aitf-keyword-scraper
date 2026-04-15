@@ -29,6 +29,7 @@ DATE_PRESETS = {
 def render():
     inject_theme()
     st.title("Trending Keywords")
+    st.caption("Raw keywords from Google Trends / Trends24 and their progress toward news sampling. Source badge shows origin platform.")
 
     # ── Filters ────────────────────────────────────────────────────────────────
     c_src, c_date = st.columns([1, 2])
