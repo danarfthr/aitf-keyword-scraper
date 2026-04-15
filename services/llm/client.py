@@ -1,5 +1,6 @@
 import asyncio
 import os
+import random
 import httpx
 from loguru import logger
 
@@ -17,7 +18,7 @@ class OpenRouterClient:
         self.api_key = os.environ.get("OPENROUTER_API_KEY", "")
         self.model = os.environ.get("LLM_MODEL", "anthropic/claude-3-haiku")
         
-        calls_per_min = int(os.environ.get("LLM_MAX_CALLS_PER_MINUTE", "20"))
+        calls_per_min = int(os.environ.get("LLM_MAX_CALLS_PER_MINUTE", "10"))
         self._semaphore = asyncio.Semaphore(calls_per_min)
         self._release_delay = 60.0
         
@@ -43,7 +44,7 @@ class OpenRouterClient:
         asyncio.ensure_future(self._release_semaphore_later())
         
         retries = 3
-        delay = 2.0
+        base_delay = 15.0
         
         payload = {
             "model": self.model,
@@ -58,7 +59,7 @@ class OpenRouterClient:
                     if resp.status_code in (429, 500, 502, 503, 504):
                         logger.warning(f"LLM API retrying {resp.status_code} on attempt {attempt}")
                         if attempt < retries:
-                            await asyncio.sleep(delay ** attempt)
+                            await asyncio.sleep(base_delay * attempt + random.uniform(0, 5))
                             continue
                         raise LLMError(f"OpenRouter permanent failure after {retries} retries: {resp.status_code}")
                     
@@ -76,7 +77,7 @@ class OpenRouterClient:
             except httpx.RequestError as e:
                 logger.warning(f"LLM API request error on attempt {attempt}: {e}")
                 if attempt < retries:
-                    await asyncio.sleep(delay ** attempt)
+                    await asyncio.sleep(base_delay * attempt + random.uniform(0, 5))
                     continue
                 raise LLMError(f"OpenRouter permanent network failure: {e}")
                 
