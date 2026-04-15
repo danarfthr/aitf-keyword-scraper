@@ -1,5 +1,6 @@
 """Shared API client for the dashboard with retry and freshness tracking."""
 
+import os
 import time
 from datetime import datetime, timezone, timedelta
 from typing import Any
@@ -172,6 +173,27 @@ def get_enriched(
             )
         )
     return items, fetched_at
+
+
+def trigger_scrape(source: str = "all") -> dict[str, Any]:
+    """POST /pipeline/trigger — requires X-API-Key auth."""
+    api_key = os.environ.get("API_SECRET_KEY", "")
+    headers = {"X-API-Key": api_key} if api_key else {}
+    try:
+        r = httpx.post(
+            f"{_API_BASE}/pipeline/trigger",
+            json={"source": source},
+            headers=headers,
+            timeout=10.0,
+        )
+        if r.status_code == 409:
+            return {"ok": False, "error": "A scrape cycle is already running."}
+        r.raise_for_status()
+        return {"ok": True, "data": r.json()}
+    except httpx.HTTPStatusError as e:
+        return {"ok": False, "error": f"HTTP {e.response.status_code}: {e.response.text}"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 
 def get_keyword_detail(keyword_id: int) -> KeywordDetail | None:

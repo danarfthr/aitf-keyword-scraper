@@ -12,7 +12,7 @@ import pandas as pd
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 
-from dashboard_pages._api import get_health, get_stuck, format_wib
+from dashboard_pages._api import get_health, get_stuck, trigger_scrape, format_wib
 from dashboard_pages._theme import inject_theme, COLORS, STATUS_COLORS, ALERT_COLORS
 from dashboard_pages.components._freshness_indicator import render_freshness_indicator
 from dashboard_pages.components._status_badge import render_status_badge
@@ -29,6 +29,7 @@ def render():
 
     health = get_health()
     stuck = get_stuck()
+    st.session_state["_health_fetched_at"] = health.fetched_at
 
     # ── KPI row ────────────────────────────────────────────────────────────────
     total = sum(health.counts.values())
@@ -38,10 +39,10 @@ def render():
 
     k1, k2, k3, k4, k5 = st.columns(5)
     k1.metric("Total Keywords", total)
-    k2.metric("In Progress", in_progress)
-    k3.metric("Enriched", enriched, help="Ready for Team 4")
-    k4.metric("Failed", failed, help="Auto-retry after 30 min")
-    k5.metric("Expired", health.counts.get("expired", 0), help="No longer trending, archived")
+    k2.metric("In Progress", in_progress, help="Keywords in active stages: raw + news_sampled + llm_justified. Not yet enriched or failed.")
+    k3.metric("Enriched", enriched, help="Ready for Team 4 — passed LLM justification and enrichment.")
+    k4.metric("Failed", failed, help="Auto-retry after 30 min cooldown. Check service logs if failures persist.")
+    k5.metric("Expired", health.counts.get("expired", 0), help="No longer trending — archived automatically after 24h inactivity.")
 
     st.divider()
 
@@ -92,6 +93,26 @@ def render():
         st.caption(f"Started: {started} | Finished: {finished}")
     else:
         st.info("No scrape run recorded yet. Trigger a scrape to get started.")
+
+    # ── Trigger scrape ────────────────────────────────────────────────────────
+    st.divider()
+    st.subheader("Trigger Scrape")
+    with st.container():
+        t1, t2 = st.columns([1, 2])
+        with t1:
+            source = st.selectbox(
+                "Source",
+                ["all", "trends24", "google_trends"],
+                label_visibility="collapsed",
+            )
+        with t2:
+            if st.button("Run Scrapers", type="primary", use_container_width=True):
+                with st.spinner("Triggering..."):
+                    result = trigger_scrape(source)
+                if result.get("ok"):
+                    st.success(f"Scrape triggered! Run ID: {result['data'].get('scrape_run_id')}")
+                else:
+                    st.error(f"Failed: {result.get('error', 'Unknown error')}")
 
     st.divider()
 
