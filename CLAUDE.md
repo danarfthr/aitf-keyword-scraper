@@ -173,6 +173,19 @@ alembic revision --autogenerate -m "description"
 alembic upgrade head
 ```
 
+## Sampler / Crawl4AI Notes
+
+- **`wait_until`**: Always use `"load"` — `"networkidle"` never fires on Indonesian news sites (infinite ad/tracker requests)
+- **Stealth flags**: Avoid `magic=True` and `enable_stealth=True` — they trigger *more* Cloudflare blocking on tribun/kompas; use `simulate_user=True` + `override_navigator=True` instead
+- **`user_agent_generator_config`**: Not supported by the installed Crawl4AI version (`ValidUAGenerator.generate()` rejects kwargs); use `user_agent_mode="random"` alone
+- **Tribun/Kompas**: Cloudflare-protected — intermittently blocks Docker egress IPs; optional proxy wired via `CRAWLER_PROXY_URL` / `CRAWLER_PROXY_USER` / `CRAWLER_PROXY_PASS` env vars
+- **0 articles on K-pop keywords**: Expected — hashtags like `#DearMySUNWOODay` don't appear in Indonesian news; not a crawler bug
+
+## LLM / OpenRouter Notes
+
+- **Rate limit**: OpenRouter free tier ~10 RPM; default semaphore is 10 — don't raise it
+- **Retry backoff**: Use `15s × attempt + jitter(0-5s)` — anything faster causes cascading 429s
+
 ## Git Workflow
 
 - Branch: `streamlit-revamp` for current work (see `git branch` for active branch)
