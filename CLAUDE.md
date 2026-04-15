@@ -39,10 +39,14 @@ python services/expiry/main.py
 pytest tests/ -v
 pytest tests/test_scraper.py::test_trends24_returns_list -v
 
+# Smoke tests
+pytest tests/smoke/ -v
+
 # Docker
 docker compose build
 docker compose up -d
 docker compose logs <service>
+docker compose logs -f <service> - Follow logs in real-time
 ```
 
 ## Critical Patterns
