@@ -34,6 +34,20 @@ services:
     volumes:
       - /tmp:/tmp
 
+  scraper:
+    build:
+      context: .
+      dockerfile: services/scraper/Dockerfile
+    container_name: aitf-scraper
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-aitf}:${POSTGRES_PASSWORD:-change_me_in_production}@postgres:5432/${POSTGRES_DB:-aitf_keywords}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - /tmp:/tmp
+
   sampler:
     build:
       context: .

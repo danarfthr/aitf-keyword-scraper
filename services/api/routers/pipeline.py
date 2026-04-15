@@ -2,16 +2,13 @@
 
 import os
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func
 from loguru import logger
 
 from shared.shared.db import get_session
 from shared.shared.models import Keyword, ScrapeRun
 from shared.shared.constants import KeywordStatus
-from services.scraper.trends24 import scrape_trends24
-from services.scraper.google_trends import scrape_google_trends
-from services.scraper.delta import detect_delta
 from ..auth import require_api_key
 from ..schemas import (
     TriggerRequest,
@@ -25,58 +22,6 @@ from ..schemas import (
 )
 
 router = APIRouter()
-
-
-async def run_scrape_cycle(source: str, run_id: int) -> None:
-    """Background task: scrape, detect delta, bulk insert keywords."""
-    from loguru import logger as log
-
-    log.info(f"Starting scrape cycle for run_id={run_id}, source={source}")
-    try:
-        all_scraped = []
-        if source in ["trends24", "all"]:
-            t24 = await scrape_trends24()
-            all_scraped.extend(t24)
-            log.info(f"Trends24 scraped {len(t24)} keywords")
-        if source in ["google_trends", "all"]:
-            gtr = await scrape_google_trends()
-            all_scraped.extend(gtr)
-            log.info(f"Google Trends scraped {len(gtr)} keywords")
-
-        window_minutes = int(os.environ.get("SCRAPE_WINDOW_MINUTES", "120"))
-
-        async with get_session() as session:
-            deltas = await detect_delta(all_scraped, session, window_minutes)
-            log.info(f"Delta detected: {len(deltas)} new keywords")
-
-            for d in deltas:
-                kw = Keyword(
-                    keyword=d["keyword"],
-                    source=d["source"],
-                    rank=d.get("rank"),
-                    status=KeywordStatus.RAW,
-                )
-                session.add(kw)
-
-            run = await session.get(ScrapeRun, run_id)
-            if run:
-                run.status = "done"
-                run.finished_at = func.now()
-                run.keywords_inserted = len(deltas)
-            await session.commit()
-
-        log.info(f"Scrape cycle complete for run_id={run_id}")
-    except Exception as e:
-        log.error(f"Scrape cycle failed for run_id={run_id}: {e}")
-        try:
-            async with get_session() as session:
-                run = await session.get(ScrapeRun, run_id)
-                if run:
-                    run.status = "failed"
-                    run.finished_at = func.now()
-                await session.commit()
-        except Exception:
-            pass
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -231,11 +176,11 @@ async def get_stuck_keywords():
 @router.post("/trigger", status_code=202, response_model=TriggerResponse)
 async def trigger_scrape(
     body: TriggerRequest,
-    background_tasks: BackgroundTasks,
     _=Depends(require_api_key),
 ):
     """
-    POST /pipeline/trigger — Trigger scrape cycle (requires X-API-Key).
+    POST /pipeline/trigger — Create a scrape run record for the Scraper service.
+    The Scraper service polls for pending runs and executes them.
     Idempotency: returns 409 if a cycle is already running.
     """
     if body.source not in ["trends24", "google_trends", "all"]:
@@ -257,28 +202,29 @@ async def trigger_scrape(
                 status_code=409, detail="A scrape cycle is already running."
             )
 
-        # Insert scrape_run record
+        # Insert scrape_run record — Scraper service picks it up
         run = ScrapeRun(source=body.source, status="running")
         session.add(run)
         await session.commit()
         await session.refresh(run)
         run_id = run.id
 
-    # Fire background task
-    background_tasks.add_task(run_scrape_cycle, source=body.source, run_id=run_id)
-    logger.info(f"Triggered scrape cycle run_id={run_id} source={body.source}")
+    logger.info(f"Created scrape run run_id={run_id} source={body.source}")
 
     return TriggerResponse(
-        triggered=True, scrape_run_id=run_id, message="Scrape cycle started."
+        triggered=True, scrape_run_id=run_id, message="Scrape cycle queued for Scraper service."
     )
 
 
 @router.post("/expire", response_model=ExpireResponse)
 async def trigger_expiry(_=Depends(require_api_key)):
-    """POST /pipeline/expire — Manually trigger all three passes of the expiry job."""
-    # TODO(team4): wire up manual expiry trigger
-    logger.warning("Manual /pipeline/expire called but not yet wired to expiry service")
-    return ExpireResponse(triggered=True, message="Expiry job started.")
+    """POST /pipeline/expire — The Expiry service runs on a 30-min cron schedule.
+
+    This endpoint does not run expiry inline (avoids coupling). The Expiry service
+    will process all pending keywords on its next scheduled run (within ~30 min).
+    """
+    logger.info("Manual /pipeline/expire acknowledged — expiry runs on 30-min cron")
+    return ExpireResponse(triggered=True, message="Expiry service runs on a 30-min cron — next run within ~30 min.")
 
 
 @router.post("/retry-failed", response_model=RetryFailedResponse)
