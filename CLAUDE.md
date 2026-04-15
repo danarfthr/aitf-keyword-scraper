@@ -9,15 +9,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Architecture
 
 ```
-[API + FastAPI] → [Sampler] → [LLM Service] → [Expiry Job]
-       ↓              ↓              ↓              ↓
-   PostgreSQL    PostgreSQL     PostgreSQL     PostgreSQL
+┌─────────────┐      ┌─────────────┐
+│   Scraper   │      │   Sampler   │      ┌───────────┐
+│  (service)  │      │  (service)  │      │    LLM    │
+│             │      │             │      │ (service) │
+└──────┬──────┘      └──────┬──────┘      └──────┬────┘
+       │                    │                    │
+       ▼                    ▼                    ▼
+┌─────────────────────────────────────────────────┐
+│                  PostgreSQL                     │
+└─────────────────────────────────────────────────┘
+       ▲                    ▲                    ▲
+       │                    │                    │
+┌──────┴──────┐      ┌──────┴──────┐      ┌──────┴──────┐
+│     API     │      │   Expiry    │      │    Demo     │
+│  (FastAPI)  │      │  (cronjob)  │      │ (Streamlit) │
+└─────────────┘      └─────────────┘      └─────────────┘
 ```
 
 - **Stateless services**: All state lives in PostgreSQL only
 - **Keyword lifecycle**: Driven by `status` column (raw → news_sampled → llm_justified → enriched → expired/failed)
 - **Concurrency**: All polling queries use `SELECT FOR UPDATE SKIP LOCKED` to prevent race conditions
-- **No standalone scraper container**: Scraper is a library imported by API as FastAPI BackgroundTask
+- **Scraper trigger**: `POST /pipeline/trigger` writes a ScrapeRun row; Scraper service polls and executes
 
 ## Key Commands
 
@@ -30,6 +43,7 @@ alembic revision --autogenerate -m "description"
 alembic upgrade head
 
 # Run single service
+python services/scraper/main.py
 uvicorn services.api.main:app --host 127.0.0.1 --port 8000
 python services/sampler/main.py
 python services/llm/main.py
@@ -46,8 +60,19 @@ pytest tests/smoke/ -v
 docker compose build
 docker compose up -d
 docker compose logs <service>
-docker compose logs -f <service> - Follow logs in real-time
+docker compose logs -f <service>   # Follow logs in real-time
+docker compose ps                   # List running containers and status
+docker compose restart <service>    # Restart specific service without losing state
 ```
+
+## Docker & Service Notes
+
+- **Docker compose:** `docker compose up -d` runs all services; each service has its own `Dockerfile` in its directory (e.g., `services/scraper/Dockerfile`)
+- **Adding new services:** Create Dockerfile in service directory, then add service entry to `docker-compose.yml` with proper depends_on and environment links
+- **Scraper service:** Polls `ScrapeRun` table for jobs; if pipeline shows degraded, check scraper container logs and PostgreSQL connectivity
+- **Pipeline health:** Streamlit sidebar shows colored dot (green=healthy, yellow=degraded); health check endpoint is `GET /pipeline/health`
+- **Pipeline trigger:** `POST /pipeline/trigger` creates a ScrapeRun row; scraper picks it up asynchronously
+- **Pipeline health logic:** `GET /pipeline/health` aggregates status from all service poll results (scraper, sampler, llm, expiry)
 
 ## Critical Patterns
 
@@ -97,10 +122,11 @@ All read from `.env` via `python-dotenv`. Never hardcode. Key vars:
 │       └── models.py     # SQLAlchemy ORM models
 │
 ├── services/
-│   ├── scraper/          # Library only (NO Dockerfile, NO container)
+│   ├── scraper/          # Polling service — scrapes trends + delta detection
 │   │   ├── trends24.py
 │   │   ├── google_trends.py
-│   │   └── delta.py
+│   │   ├── delta.py
+│   │   └── main.py       # Entry point (polls ScrapeRun table)
 │   ├── sampler/          # Crawls detik/kompas/tribun news sites
 │   ├── llm/             # OpenRouter justifier + enricher
 │   ├── expiry/          # APScheduler cleanup job
@@ -116,16 +142,18 @@ All read from `.env` via `python-dotenv`. Never hardcode. Key vars:
 
 | Service | Polls For | Produces |
 |---------|-----------|----------|
-| API | — | Runs scraper as BackgroundTask |
+| Scraper | `ScrapeRun` rows with `status=running` | Keywords with `status=raw` in PostgreSQL |
+| API | — | REST API. Creates ScrapeRun rows; `POST /pipeline/trigger` enqueues scrape jobs. |
 | Sampler | `status=raw` | Articles, sets `status=news_sampled` |
 | LLM (Justifier) | `status=news_sampled` | KeywordJustification, sets `status=llm_justified` |
 | LLM (Enricher) | `status=llm_justified` + `is_relevant=true` | KeywordEnrichment, sets `status=enriched` |
-| Expiry | 3-pass cron | Sets `status=expired` or `status=raw` (retry) |
+| Expiry | 3-pass cron (30 min) | Sets `status=expired` or `status=raw` (retry) |
 
 ## API Endpoints
 
 - `GET /pipeline/health` — Pipeline status (public)
-- `POST /pipeline/trigger` — Trigger scrape cycle (requires X-API-Key)
+- `POST /pipeline/trigger` — Enqueue scrape job for Scraper service (requires X-API-Key). Returns immediately.
+- `POST /pipeline/expire` — Expiry service runs on 30-min cron (informational only)
 - `GET /keywords/enriched` — Enriched keywords for Team 4 (public)
 - `GET /keywords/{id}` — Full keyword detail (public)
 
