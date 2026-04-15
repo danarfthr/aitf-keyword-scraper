@@ -27,12 +27,15 @@ async def process_keyword(session, keyword: Keyword):
             crawl_tribun(keyword.keyword),
             return_exceptions=True,
         )
-        
+
         all_articles = []
+        exceptions = []
         for r in results:
             if isinstance(r, list):
                 all_articles.extend(r)
-                
+            elif isinstance(r, Exception):
+                exceptions.append(r)
+
         # Deduplicate
         seen_urls = set()
         deduped = []
@@ -40,9 +43,9 @@ async def process_keyword(session, keyword: Keyword):
             if a["url"] not in seen_urls:
                 seen_urls.add(a["url"])
                 deduped.append(a)
-                
+
         selected = deduped[:MAX_ARTICLES_TOTAL_PER_KEYWORD]
-        
+
         for art in selected:
             body_to_store, summary_to_store = summarize_body(art["body"])
             stmt = insert(Article).values(
@@ -54,11 +57,16 @@ async def process_keyword(session, keyword: Keyword):
                 summary=summary_to_store,
             ).on_conflict_do_nothing(index_elements=["url"])
             await session.execute(stmt)
-            
+
         keyword.status = KeywordStatus.NEWS_SAMPLED
         if not selected:
-            logger.warning(f"No articles found for keyword: {keyword.keyword}")
-            
+            logger.warning(
+                f"No articles found for keyword: {keyword.keyword} "
+                f"(exceptions: {len(exceptions)})"
+            )
+        else:
+            logger.info(f"Keyword '{keyword.keyword}': collected {len(selected)} articles")
+
     except Exception as e:
         logger.error(f"Error processing keyword {keyword.keyword}: {e}")
         keyword.status = KeywordStatus.FAILED
