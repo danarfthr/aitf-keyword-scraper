@@ -10,7 +10,13 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel sqlalchemy[asyncio
 
 COPY shared /app/shared
 
-RUN pip install --no-cache-dir loguru fastapi "uvicorn[standard]" pydantic httpx
+RUN pip install --no-cache-dir loguru fastapi "uvicorn[standard]" pydantic httpx alembic
+
+COPY alembic /app/alembic
+COPY alembic.ini /app/alembic.ini
+COPY shared /app/shared
+
+ENV DATABASE_URL_SYNC=postgresql+psycopg2://${POSTGRES_USER:-aitf}:${POSTGRES_PASSWORD:-change_me_in_production}@postgres:5432/${POSTGRES_DB:-aitf_keywords}
 
 COPY services/api /app/services/api
 

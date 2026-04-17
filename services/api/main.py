@@ -1,6 +1,7 @@
 """FastAPI application entry point for Keyword Manager API."""
 
 import os
+import subprocess
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from loguru import logger
@@ -12,7 +13,17 @@ from .routers import keywords, pipeline
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Verify DB connection on startup. Log graceful stop on shutdown."""
+    """Run Alembic migrations on startup, then verify DB connection. Log graceful stop on shutdown."""
+    try:
+        subprocess.run(
+            ["alembic", "upgrade", "head"],
+            check=True,
+            capture_output=True,
+            env={**os.environ, "PYTHONPATH": "/app"},
+        )
+        logger.info("Alembic migrations applied successfully")
+    except subprocess.CalledProcessError as e:
+        logger.warning(f"Alembic migration failed (may already be up-to-date): {e.stderr.decode() if e.stderr else e}")
     try:
         async with get_session() as session:
             await session.execute(text("SELECT 1"))

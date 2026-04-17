@@ -66,7 +66,7 @@ def _render_overview(detail) -> None:
     st.markdown(f"**Keyword:** `{detail.keyword}`")
     st.markdown(f"**Scraped at:** `{format_wib(detail.scraped_at)}`")
     st.markdown(f"**Last updated:** `{format_wib(detail.updated_at)}`")
-    st.markdown(f"**Status:** {render_status_badge(detail.status)}")
+    st.markdown(f"**Status:** {render_status_badge(detail.status)}", unsafe_allow_html=True)
     st.caption(_STATUS_HINTS.get(detail.status, ""))
     if detail.failure_reason:
         st.error(f"**Failure:** {detail.failure_reason}")
