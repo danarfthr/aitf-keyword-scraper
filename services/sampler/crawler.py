@@ -90,6 +90,12 @@ _KOMPAS_SEARCH = "https://www.kompas.com/search?q={keyword}"
 
 _TRIBUN_SEARCH = "https://www.tribunnews.com/search?q={keyword}"
 
+_CNBC_SEARCH = "https://www.cnbcindonesia.com/search?query={keyword}"
+
+_CNN_SEARCH = "https://www.cnnindonesia.com/search?q={keyword}"
+
+_ANTARA_SEARCH = "https://www.antaranews.com/search?q={keyword}"
+
 
 async def crawl_detik(keyword: str) -> list[dict]:
     url = _DETIK_SEARCH.format(keyword=urllib.parse.quote(keyword))
@@ -104,6 +110,21 @@ async def crawl_kompas(keyword: str) -> list[dict]:
 async def crawl_tribun(keyword: str) -> list[dict]:
     url = _TRIBUN_SEARCH.format(keyword=urllib.parse.quote(keyword))
     return await _crawl_articles(keyword, "tribun", url)
+
+
+async def crawl_cnbc(keyword: str) -> list[dict]:
+    url = _CNBC_SEARCH.format(keyword=urllib.parse.quote(keyword))
+    return await _crawl_articles(keyword, "cnbc", url)
+
+
+async def crawl_cnn(keyword: str) -> list[dict]:
+    url = _CNN_SEARCH.format(keyword=urllib.parse.quote(keyword))
+    return await _crawl_articles(keyword, "cnn", url)
+
+
+async def crawl_antara(keyword: str) -> list[dict]:
+    url = _ANTARA_SEARCH.format(keyword=urllib.parse.quote(keyword))
+    return await _crawl_articles(keyword, "antara", url)
 
 
 # ── Core crawl ─────────────────────────────────────────────────────────────────
@@ -233,6 +254,42 @@ def _extract_links(html: str, source: str) -> list[str]:
                 seen.add(url)
                 links.append(url)
 
+    elif source == "cnbc":
+        # Article: https://www.cnbcindonesia.com/news/YYYYMMDDHHMMSS-CATID-ARTICLEID/slug
+        pat = r'href="(https?://www\.cnbcindonesia\.com/news/[^"?]+)"'
+        for raw in re.findall(pat, html, re.IGNORECASE):
+            url = raw.rstrip()
+            if "cnbcindonesia.com/search" in url or url in seen:
+                continue
+            # timestamp-catId-articleId pattern
+            if re.search(r'/news/\d{14}-\d+-\d+/', url):
+                seen.add(url)
+                links.append(url)
+
+    elif source == "cnn":
+        # Article: https://www.cnnindonesia.com/[category]/YYYYMMDDHHMMSS-ARTICLEID/slug
+        pat = r'href="(https?://www\.cnnindonesia\.com/[^"?]+)"'
+        for raw in re.findall(pat, html, re.IGNORECASE):
+            url = raw.rstrip()
+            if "cnnindonesia.com/search" in url or url in seen:
+                continue
+            # timestamp-articleId pattern
+            if re.search(r'/\d{14}-\d+/', url):
+                seen.add(url)
+                links.append(url)
+
+    elif source == "antara":
+        # Article: https://www.antaranews.com/YYYY/MM/DD/slug
+        pat = r'href="(https?://www\.antaranews\.com/[^"?]+)"'
+        for raw in re.findall(pat, html, re.IGNORECASE):
+            url = raw.rstrip()
+            if "antaranews.com/search" in url or url in seen:
+                continue
+            # year/month/day/slug pattern
+            if re.search(r'/\d{4}/\d{2}/\d{2}/', url):
+                seen.add(url)
+                links.append(url)
+
     return links
 
 
@@ -249,6 +306,16 @@ def _extract_title(html: str, source: str) -> str:
         ],
         "tribun": [
             r'<h1[^>]*\bclass="[^"]*\bf40\b[^"]*"[^>]*>(.*?)</h1>',
+            r'<h1[^>]*>(.*?)</h1>',
+        ],
+        "cnbc": [
+            r'<h1[^>]*\bclass="[^"]*\btitle\b[^"]*"[^>]*>(.*?)</h1>',
+            r'<h1[^>]*>(.*?)</h1>',
+        ],
+        "cnn": [
+            r'<h1[^>]*>(.*?)</h1>',
+        ],
+        "antara": [
             r'<h1[^>]*>(.*?)</h1>',
         ],
     }
@@ -281,6 +348,43 @@ def _extract_body(html: str, source: str) -> str:
     elif source == "tribun":
         m = re.search(
             r'<div[^>]*\bid="article-2"[^>]*>(.*?)</div>',
+            html, re.DOTALL,
+        )
+        if m:
+            return _strip_tags(m.group(1))
+        # fallback: collect <p> tags
+        paras = re.findall(r'<p[^>]*>(.*?)</p>', html, re.DOTALL)
+        if paras:
+            return " ".join(_strip_tags(p) for p in paras[:15] if _strip_tags(p))
+
+    elif source == "cnbc":
+        # Try class containing "content" or "article"
+        m = re.search(
+            r'<div[^>]*\bclass="[^"]*\bcontent\b[^"]*"[^>]*>(.*?)</div>',
+            html, re.DOTALL,
+        )
+        if m:
+            return _strip_tags(m.group(1))
+        # fallback: collect <p> tags
+        paras = re.findall(r'<p[^>]*>(.*?)</p>', html, re.DOTALL)
+        if paras:
+            return " ".join(_strip_tags(p) for p in paras[:15] if _strip_tags(p))
+
+    elif source == "cnn":
+        m = re.search(
+            r'<div[^>]*\bclass="[^"]*\bcontent\b[^"]*"[^>]*>(.*?)</div>',
+            html, re.DOTALL,
+        )
+        if m:
+            return _strip_tags(m.group(1))
+        # fallback: collect <p> tags
+        paras = re.findall(r'<p[^>]*>(.*?)</p>', html, re.DOTALL)
+        if paras:
+            return " ".join(_strip_tags(p) for p in paras[:15] if _strip_tags(p))
+
+    elif source == "antara":
+        m = re.search(
+            r'<div[^>]*\bclass="[^"]*\barticle[-_]?body\b[^"]*"[^>]*>(.*?)</div>',
             html, re.DOTALL,
         )
         if m:

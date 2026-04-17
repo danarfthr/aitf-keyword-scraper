@@ -19,11 +19,14 @@ class KeywordSource:
 
 class ArticleSource:
     DETIK  = "detik"
-    KOMPAS = "kompas"
+    Kompas = "kompas"
     TRIBUN = "tribun"
+    CNBC   = "cnbc"
+    CNN    = "cnn"
+    ANTARA = "antara"
 
 
-ARTICLE_SOURCES = [ArticleSource.DETIK, ArticleSource.KOMPAS, ArticleSource.TRIBUN]
+ARTICLE_SOURCES = [ArticleSource.DETIK, ArticleSource.Kompas, ArticleSource.TRIBUN, ArticleSource.CNBC, ArticleSource.CNN, ArticleSource.ANTARA]
 
 # Characters before body is replaced by a truncated summary
 SUMMARY_CHAR_THRESHOLD = 3000

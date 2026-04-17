@@ -13,7 +13,7 @@ from shared.shared.constants import (
 from shared.shared.db import get_session
 from shared.shared.models import Article, Keyword
 
-from .crawler import crawl_detik, crawl_kompas, crawl_tribun
+from .crawler import crawl_detik, crawl_kompas, crawl_tribun, crawl_cnbc, crawl_cnn, crawl_antara
 from .summarizer import summarize_body
 
 SAMPLER_POLL_INTERVAL_SECONDS = int(os.environ.get("SAMPLER_POLL_INTERVAL_SECONDS", "30"))
@@ -25,6 +25,9 @@ async def process_keyword(session, keyword: Keyword):
             crawl_detik(keyword.keyword),
             crawl_kompas(keyword.keyword),
             crawl_tribun(keyword.keyword),
+            crawl_cnbc(keyword.keyword),
+            crawl_cnn(keyword.keyword),
+            crawl_antara(keyword.keyword),
             return_exceptions=True,
         )
 
