@@ -188,6 +188,8 @@ alembic upgrade head
 
 ## Git Workflow
 
-- Branch: `streamlit-revamp` for current work (see `git branch` for active branch)
+- Use `git branch -a` to see all local and remote branches (remote-only branches shown separately)
+- After merging a feature branch: `git push -d origin <branch-name>` to delete the remote branch
 - Commit convention: `<scope>: <description>` (scopes: schema, shared, scraper, sampler, llm, expiry, api, demo, infra, tests)
 - All commits go to feature branches, then PR to `master`
+- Current active branch: `master`
