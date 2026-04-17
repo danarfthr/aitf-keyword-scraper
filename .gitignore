@@ -1,26 +1,55 @@
-# Python-generated files
+# Environment
+.env
+
+# Python
+*.pyc
+*.pyo
 __pycache__/
-*.py[oc]
+*.egg-info/
+.eggs/
 build/
 dist/
-wheels/
-*.egg-info
+.coverage
+htmlcov/
+.pytest_cache/
 
-# Virtual environments
-.venv
+# Virtual Environments
+.venv/
 
-# Scraped output
-data/
+# IDE/Editors
+.idea/
+.vscode/
+*.swp
+*~
 
-# macOS metadata
+# OS
 .DS_Store
+Thumbs.db
 
-# Hugging Face model cache
-.cache/
+# Streamlit
+.streamlit/
 
-# Claude Code
+# Claude/App Tools
 .claude/
 .superpowers/
-
-# Git worktrees
+.backup/
 .worktrees/
+.playwright-mcp/
+
+# Docker
+Dockerfile.local
+docker-compose.local.yml
+*.local.yml
+*.local.yaml
+*.local.*
+
+# Logs
+*.log
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Temp
+/tmp/heartbeat*

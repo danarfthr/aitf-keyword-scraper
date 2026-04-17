@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aitf-shared"
+version = "1.0.0"
+dependencies = [
+    "sqlalchemy[asyncio]>=2.0",
+    "asyncpg",
+    "psycopg2-binary",
+    "python-dotenv",
+]
