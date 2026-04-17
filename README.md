@@ -2,23 +2,41 @@
 
 Microservice pipeline that scrapes trending keywords from Google Trends and Trends24 Indonesia, samples relevant news articles via crawler, uses OpenRouter LLM to determine government relevance, and enriches relevant keywords with expanded search terms. Output is consumed by Team 4 via REST API.
 
-**Architecture:** 6-service Docker Compose deployment (API, Scraper, Sampler, LLM, Expiry, Demo) + PostgreSQL.
+## Architecture
 
----
+```mermaid
+graph TB
+    subgraph "External"
+        T24[Trends24] GT[Google Trends] OR[OpenRouter]
+    end
+    subgraph "Services"
+        API[API :8000] SCR[Scraper] SAM[Sampler] LLM[LLM] EXP[Expiry] DEM[Demo :8501]
+    end
+    API --> SCR --> PG[(PostgreSQL)] <-- SAM
+    PG <-- LLM --> OR
+    PG <-- EXP
+    DEM --> API
+```
 
 ## Keyword Lifecycle
 
-```
-raw → news_sampled → llm_justified → enriched → expired
-                         ↓
-                      (failed → raw, auto-retry)
+```mermaid
+stateDiagram-v2
+    [*] --> raw --> news_sampled --> llm_justified --> enriched --> expired
+    llm_justified --> expired: is_relevant=false
+    enriched --> failed --> raw: retry
 ```
 
-1. **API** — `POST /pipeline/trigger` creates a ScrapeRun row; **Scraper** polls and executes it, scraping Trends24/Google Trends and inserting delta keywords as `raw`
-2. **Sampler** — Polls `status=raw`, crawls detik/kompas/tribun news, sets `news_sampled`
-3. **LLM Justifier** — Polls `status=news_sampled`, calls OpenRouter to classify relevance, sets `llm_justified`
-4. **LLM Enricher** — Polls `status=llm_justified` + `is_relevant=true`, generates expanded keywords, sets `enriched`
-5. **Expiry Job** — Cron job: expires stale enriched, expires irrelevant justified, retries failed keywords
+## Pipeline Flow
+
+```mermaid
+flowchart LR
+    SCR[Scrape] --> T24[Trends24] & GT[Google]
+    SCR --> SAM[Sampler] --> DK[Detik] & KP[Kompas] & TB[Tribun]
+    SAM --> LLM[LLM] --> OR[OpenRouter]
+    LLM --> EXP[Expiry]
+    EXP --> PG[(DB)]
+```
 
 ---
 
@@ -219,7 +237,7 @@ Webhook/Scheduler integration: `POST /pipeline/trigger` with X-API-Key header.
 │   └── demo/                # Streamlit read-only dashboard
 │       └── dashboard_pages/ # P01–P05 Streamlit pages (radio-button nav)
 ├── alembic/                  # Database migrations
-├── docs/                     # Architecture diagrams (Mermaid.js)
+├── docs/                     # Additional Mermaid diagrams (11 total)
 ├── tests/                    # pytest + pytest-asyncio
 ├── docker-compose.yml
 └── SPEC.md                   # Full specification document
@@ -245,7 +263,7 @@ pytest tests/ -v
 
 ---
 
-## Architecture
+## Additional Diagrams
 
 See [docs/architecture_diagrams.md](docs/architecture_diagrams.md) for 11 Mermaid.js diagrams covering:
 - System architecture (C4-style container diagram)
