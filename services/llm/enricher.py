@@ -22,9 +22,13 @@ async def enrich_keyword(
     context = build_article_context(articles)
     prompt = build_enricher_prompt(keyword.keyword, context)
     messages = build_messages(ENRICHER_SYSTEM, prompt)
-    
+
+    logger.info(
+        f"[LLM:ENRICHER] Starting | keyword_id={keyword.id} | keyword='{keyword.keyword}' | articles={len(articles)}"
+    )
+
     expanded_keywords = []
-    
+
     try:
         for attempt in range(2):
             try:
@@ -80,3 +84,6 @@ async def enrich_keyword(
     await session.execute(stmt)
     
     keyword.status = KeywordStatus.ENRICHED
+    logger.info(
+        f"[LLM:ENRICHER] Done | keyword_id={keyword.id} | keyword='{keyword.keyword}' | expanded={expanded_keywords}"
+    )

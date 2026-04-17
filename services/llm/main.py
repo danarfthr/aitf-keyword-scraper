@@ -22,6 +22,7 @@ async def run_llm_service():
     while True:
         try:
             # Phase 1 - Justifier
+            logger.info(f"[LLM:JUSTIFIER] Polling batch | status=news_sampled | batch_size={LLM_BATCH_SIZE}")
             async with get_session() as session:
                 async with session.begin():
                     result = await session.execute(
@@ -36,8 +37,10 @@ async def run_llm_service():
                     
                     for kw in justifier_keywords:
                         await justify_keyword(kw, list(kw.articles), client, session)
-            
+                    logger.info(f"[LLM:JUSTIFIER] Batch complete | processed={len(justifier_keywords)}")
+
             # Phase 2 - Enricher
+            logger.info(f"[LLM:ENRICHER] Polling batch | status=llm_justified+relevant | batch_size={LLM_BATCH_SIZE}")
             async with get_session() as session:
                 async with session.begin():
                     result = await session.execute(
@@ -54,6 +57,7 @@ async def run_llm_service():
                     
                     for kw in enricher_keywords:
                         await enrich_keyword(kw, list(kw.articles), client, session)
+                    logger.info(f"[LLM:ENRICHER] Batch complete | processed={len(enricher_keywords)}")
 
             with open("/tmp/llm_heartbeat.txt", "w") as f:
                 f.write(str(time.time()))

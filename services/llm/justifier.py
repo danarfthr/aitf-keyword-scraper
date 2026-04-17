@@ -22,7 +22,11 @@ async def justify_keyword(
     context = build_article_context(articles)
     prompt = build_justifier_prompt(keyword.keyword, context)
     messages = build_messages(JUSTIFIER_SYSTEM, prompt)
-    
+
+    logger.info(
+        f"[LLM:JUSTIFIER] Starting | keyword_id={keyword.id} | keyword='{keyword.keyword}' | articles={len(articles)}"
+    )
+
     is_relevant = False
     justification = "LLM parse error"
     
@@ -76,3 +80,6 @@ async def justify_keyword(
     await session.execute(stmt)
     
     keyword.status = KeywordStatus.LLM_JUSTIFIED
+    logger.info(
+        f"[LLM:JUSTIFIER] Done | keyword_id={keyword.id} | keyword='{keyword.keyword}' | is_relevant={is_relevant}"
+    )
