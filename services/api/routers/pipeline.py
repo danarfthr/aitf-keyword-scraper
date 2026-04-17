@@ -1,7 +1,7 @@
 """Pipeline control endpoints — require X-API-Key auth."""
 
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func
 from loguru import logger
@@ -85,7 +85,7 @@ async def get_stuck_keywords():
     Terminal statuses: enriched, expired, failed
     """
     async with get_session() as session:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         stuck_alerts: list[StuckAlert] = []
 
         # Non-terminal statuses that should progress
