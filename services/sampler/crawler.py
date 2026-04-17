@@ -209,23 +209,29 @@ def _extract_links(html: str, source: str) -> list[str]:
     elif source == "kompas":
         # Article: https://www.kompas.com/<section>/<id>/<slug>
         #   e.g. https://www.kompas.com/tren/news/12345/slug
-        pat = r'href="(https?://www\.kompas\.com/\w{3,}/[^"?]+"\s*)'
+        pat = r'href="(https?://www\.kompas\.com/[^"?]+)"'
         for raw in re.findall(pat, html, re.IGNORECASE):
-            url = raw.rstrip().rstrip('"')
+            url = raw.rstrip()
             if "kompas.com/search" in url or url in seen:
                 continue
-            # must have numeric segment (article ID)
-            if re.search(r'/[a-z]{3,}/\d{5,}', url):
+            # must have at least 3 path segments and a numeric article ID
+            if re.search(r'/\w+/.*/\d+', url):
                 seen.add(url)
                 links.append(url)
 
     elif source == "tribun":
-        # Article: https://www.tribunnews.com/news/<ID>/<slug>
-        pat = r'href="(https?://www\.tribunnews\.com/news/\d+[^"?]*)"'
-        for m in re.findall(pat, html, re.IGNORECASE):
-            if m not in seen:
-                seen.add(m)
-                links.append(m)
+        # Article: https://www.tribunnews.com/<section>/<ID>/<slug>
+        #   e.g. https://www.tribunnews.com/nasional/12345/some-slug
+        #   Also matches /news/<ID>/<slug> and other section prefixes
+        pat = r'href="(https?://www\.tribunnews\.com/[^"?]+)"'
+        for raw in re.findall(pat, html, re.IGNORECASE):
+            url = raw.rstrip()
+            if "tribunnews.com/search" in url or url in seen:
+                continue
+            # must contain a numeric article ID segment
+            if re.search(r'/\d{4,}/', url):
+                seen.add(url)
+                links.append(url)
 
     return links
 
