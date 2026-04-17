@@ -24,7 +24,7 @@ router = APIRouter()
 
 @router.get("/enriched", response_model=EnrichedListResponse)
 async def get_enriched_keywords(
-    limit: int = Query(default=50, ge=1, le=200),
+    limit: int = Query(default=50, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
 ):
     """GET /keywords/enriched — Enriched keywords for Team 4."""
@@ -149,7 +149,7 @@ async def get_keyword_detail(keyword_id: int):
 @router.get("/status/{status}", response_model=EnrichedListResponse)
 async def get_keywords_by_status(
     status: str,
-    limit: int = Query(default=50, ge=1, le=200),
+    limit: int = Query(default=50, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     since: Optional[str] = Query(default=None, description="ISO timestamp — only keywords scraped after this time"),
     source: Optional[str] = Query(default=None, description="Filter by source: trends24 or google_trends"),

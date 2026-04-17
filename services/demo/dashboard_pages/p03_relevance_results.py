@@ -68,17 +68,11 @@ def render():
     relevant_count = sum(1 for it in items if it.is_relevant is True)
     not_relevant_count = sum(1 for it in items if it.is_relevant is False)
     pending = sum(1 for it in items if it.is_relevant is None)
-    rate = (
-        (relevant_count / (relevant_count + not_relevant_count) * 100)
-        if (relevant_count + not_relevant_count) > 0
-        else 0
-    )
 
     s1, s2, s3, s4 = st.columns(4)
     s1.metric("Total Justified", total)
     s2.metric("Relevant", relevant_count)
     s3.metric("Not Relevant", not_relevant_count)
-    s4.metric("Relevance Rate", f"{rate:.0f}%", help="Share of justified keywords the LLM marked relevant. Calculated as relevant ÷ (relevant + not relevant).")
 
     st.divider()
 
