@@ -1,24 +1,8 @@
 # AITF Keyword Manager v2
 
-Microservice pipeline that scrapes trending keywords from Google Trends and Trends24 Indonesia, samples relevant news articles via crawler, uses OpenRouter LLM to determine government relevance, and enriches relevant keywords with expanded search terms. Output is consumed by Team 4 via REST API.
+Microservice pipeline that scrapes trending keywords from Google Trends and Trends24 Indonesia, samples relevant news articles via crawler, uses OpenRouter LLM to determine government relevance, and enriches relevant keywords with expanded search terms. Output consumed by Team 4 via REST API.
 
 **Architecture:** 6-service Docker Compose deployment (API, Scraper, Sampler, LLM, Expiry, Demo) + PostgreSQL.
-
----
-
-## Keyword Lifecycle
-
-```
-raw → news_sampled → llm_justified → enriched → expired
-                         ↓
-                      (failed → raw, auto-retry)
-```
-
-1. **API** — `POST /pipeline/trigger` creates a ScrapeRun row; **Scraper** polls and executes it, scraping Trends24/Google Trends and inserting delta keywords as `raw`
-2. **Sampler** — Polls `status=raw`, crawls detik/kompas/tribun news, sets `news_sampled`
-3. **LLM Justifier** — Polls `status=news_sampled`, calls OpenRouter to classify relevance, sets `llm_justified`
-4. **LLM Enricher** — Polls `status=llm_justified` + `is_relevant=true`, generates expanded keywords, sets `enriched`
-5. **Expiry Job** — Cron job: expires stale enriched, expires irrelevant justified, retries failed keywords
 
 ---
 
@@ -43,127 +27,6 @@ curl -X POST http://localhost:8000/pipeline/trigger \
 
 # Check enriched keywords
 curl http://localhost:8000/keywords/enriched
-```
-
----
-
-## Services
-
-| Service | Port | Responsibility |
-|---------|------|----------------|
-| `api` | 8000 | FastAPI REST API — creates ScrapeRun rows, exposes keyword endpoints |
-| `scraper` | — | Polls `ScrapeRun` table, scrapes Trends24/Google Trends, inserts delta keywords |
-| `sampler` | — | Article crawling loop via Crawl4AI (headless Chromium) polling `status=raw` |
-| `llm` | — | Justifier + enricher loop (polling `status=news_sampled`, `status=llm_justified`) |
-| `expiry` | — | APScheduler 3-pass cleanup cron |
-| `demo` | 8501 | Streamlit read-only dashboard (calls API only, no direct DB) |
-
----
-
-## Local Development
-
-```bash
-# Create virtual environment
-python3 -m venv .venv
-source .venv/bin/activate
-
-# Install dependencies
-pip install -e shared/
-pip install alembic psycopg2-binary asyncpg sqlalchemy loguru fastapi uvicorn pydantic httpx crawl4ai streamlit pytest pytest-asyncio
-playwright install chromium --with-deps  # required by sampler
-
-# Set up Alembic (one-time)
-alembic init alembic
-# Edit alembic/env.py to import Base from shared.shared.models
-alembic revision --autogenerate -m "initial schema"
-alembic upgrade head
-
-# Run individual services
-python services/scraper/main.py
-uvicorn services.api.main:app --host 127.0.0.1 --port 8000
-python services/sampler/main.py
-python services/llm/main.py
-python services/expiry/main.py
-streamlit run services/demo/app.py
-
-# Run tests
-export DATABASE_URL="postgresql+asyncpg://aitf:change_me_in_production@localhost:5432/aitf_test"
-pytest tests/ -v
-pytest tests/test_scraper.py::test_trends24_returns_list -v  # single test
-```
-
----
-
-## API Endpoints
-
-**Public (no auth):**
-- `GET /pipeline/health` — Pipeline status and keyword counts by status
-- `GET /keywords/enriched?limit=50&offset=0` — Enriched keywords for Team 4
-- `GET /keywords/{id}` — Full keyword detail with articles, justification, enrichment
-- `GET /keywords/status/{status}` — Keywords filtered by status (raw, news_sampled, llm_justified, enriched, expired, failed)
-
-**Protected (requires X-API-Key header):**
-- `POST /pipeline/trigger` — Enqueue scrape job for Scraper service (idempotent: returns 409 if already running)
-- `POST /pipeline/expire` — Informational; expiry runs on 30-min cron automatically
-- `POST /pipeline/retry-failed` — Reset all failed keywords to raw
-
----
-
-## Environment Variables
-
-```env
-# PostgreSQL
-DATABASE_URL=postgresql+asyncpg://aitf:change_me_in_production@localhost:5432/aitf_keywords
-DATABASE_URL_SYNC=postgresql+psycopg2://aitf:change_me_in_production@localhost:5432/aitf_keywords
-
-# OpenRouter
-OPENROUTER_API_KEY=sk-or-replace-me
-LLM_MODEL=anthropic/claude-3-haiku
-LLM_MAX_CALLS_PER_MINUTE=10
-
-# Scraper
-SCRAPE_WINDOW_MINUTES=120
-
-# Sampler (optional proxy for Crawl4AI — bypasses Cloudflare on tribun/kompas)
-CRAWLER_PROXY_URL=        # e.g. http://proxy.example.com:8080
-CRAWLER_PROXY_USER=
-CRAWLER_PROXY_PASS=
-SAMPLER_POLL_INTERVAL_SECONDS=30
-SAMPLER_BATCH_SIZE=5
-
-# LLM Service
-LLM_POLL_INTERVAL_SECONDS=30
-LLM_BATCH_SIZE=10
-
-# Expiry Job
-EXPIRY_THRESHOLD_HOURS=6
-IRRELEVANT_EXPIRY_HOURS=24
-FAILED_RETRY_MINUTES=30
-EXPIRY_CHECK_INTERVAL_MINUTES=30
-
-# API
-API_SECRET_KEY=change_me_in_production
-```
-
----
-
-## Docker Services
-
-```bash
-# Build all images
-docker compose build
-
-# Start all services
-docker compose up -d
-
-# View logs
-docker compose logs -f api scraper sampler llm expiry
-
-# Stop all
-docker compose down
-
-# Run migrations
-docker compose run --rm api alembic upgrade head
 ```
 
 ---
@@ -198,49 +61,35 @@ Webhook/Scheduler integration: `POST /pipeline/trigger` with X-API-Key header.
 
 ---
 
-## Project Structure
-
-```
-├── shared/
-│   └── shared/               # Pip-installable package (import: shared.shared.*)
-│       ├── constants.py      # KeywordStatus, sources, thresholds
-│       ├── db.py            # asyncpg SQLAlchemy engine
-│       └── models.py        # ORM models (Keyword, Article, Justification, Enrichment, ScrapeRun)
-├── services/
-│   ├── scraper/             # Standalone polling service (polls ScrapeRun table)
-│   │   ├── trends24.py      # Trends24 HTTP scraper
-│   │   ├── google_trends.py # Google Trends HTTP scraper
-│   │   ├── delta.py         # Delta detection
-│   │   └── main.py          # Entry point
-│   ├── sampler/             # Article crawler (Crawl4AI headless Chromium)
-│   ├── llm/                 # OpenRouter justifier + enricher
-│   ├── expiry/              # APScheduler cleanup job
-│   ├── api/                 # FastAPI REST API
-│   └── demo/                # Streamlit read-only dashboard
-│       └── dashboard_pages/ # P01–P05 Streamlit pages (radio-button nav)
-├── alembic/                  # Database migrations
-├── docs/                     # Architecture diagrams (Mermaid.js)
-├── tests/                    # pytest + pytest-asyncio
-├── docker-compose.yml
-└── SPEC.md                   # Full specification document
-```
-
----
-
-## Tests
+## Local Development
 
 ```bash
-# Run all tests
-pytest tests/ -v
+# Create virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
 
-# 38 tests covering:
-# - Delta detection logic
-# - Body summarization
-# - URL deduplication and article capping
-# - LLM justification and enrichment
-# - 3-pass expiry job
-# - API endpoints and auth
-# - Streamlit demo dashboard
+# Install dependencies
+pip install -e shared/
+pip install alembic psycopg2-binary asyncpg sqlalchemy loguru fastapi uvicorn pydantic httpx crawl4ai streamlit pytest pytest-asyncio
+playwright install chromium --with-deps  # required by sampler
+
+# Set up Alembic (one-time)
+alembic init alembic
+# Edit alembic/env.py to import Base from shared.shared.models
+alembic revision --autogenerate -m "initial schema"
+alembic upgrade head
+
+# Run individual services
+python services/scraper/main.py
+uvicorn services.api.main:app --host 127.0.0.1 --port 8000
+python services/sampler/main.py
+python services/llm/main.py
+python services/expiry/main.py
+streamlit run services/demo/app.py
+
+# Run tests
+export DATABASE_URL="postgresql+asyncpg://aitf:change_me_in_production@localhost:5432/aitf_test"
+pytest tests/ -v
 ```
 
 ---
