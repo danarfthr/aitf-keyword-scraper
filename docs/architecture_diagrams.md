@@ -28,8 +28,7 @@ graph TB
         end
 
         subgraph "services/llm"["LLM Service"]
-            JUST["justify_keyword()\nPhase 1: Justifier"]
-            ENRICH["enrich_keyword()\nPhase 2: Enricher"]
+            PROC["process_keyword()\nSingle call: justify + enrich"]
             CLIENT["OpenRouterClient\n(Semaphore rate limit)"]
             LLM_HB["/tmp/llm_heartbeat.txt"]
         end
@@ -73,17 +72,11 @@ graph TB
     SM --> SM_HB
 
     %% LLM reads/writes
-    PG -->|"SELECT status=news_sampled"| JUST
-    JUST --> CLIENT
+    PG -->|"SELECT status=news_sampled"| PROC
+    PROC --> CLIENT
     CLIENT --> OR
-    OR -->|"{is_relevant, justification}"| JUST
-    JUST -->|"UPSERT keyword_justifications\nUPDATE status=llm_justified"| PG
-
-    PG -->|"SELECT status=llm_justified\n+ is_relevant=true"| ENRICH
-    ENRICH --> CLIENT
-    CLIENT --> OR
-    OR -->|"{expanded_keywords}"| ENRICH
-    ENRICH -->|"UPSERT keyword_enrichments\nUPDATE status=enriched"| PG
+    OR -->|"{is_relevant, justification,\nexpanded_keywords?}"| PROC
+    PROC -->|"UPSERT keyword_justifications\n+ keyword_enrichments"| PG
     LLM_HB -.->|"heartbeat"| SM_HB
 
     %% Expiry reads/writes
@@ -112,7 +105,6 @@ graph TB
     style SCR fill:#40916c,color:#fff
     style SM fill:#52b788,color:#fff
     style JUST fill:#74c69d,color:#000
-    style ENRICH fill:#74c69d,color:#000
     style EXP fill:#95d5b2,color:#000
     style ST fill:#b7e4c7,color:#000
     style PG fill:#1d3557,color:#fff
@@ -126,18 +118,15 @@ graph TB
 stateDiagram-v2
     [*] --> raw
     raw --> news_sampled : sampler crawls articles
-    news_sampled --> llm_justified : justifier classifies
-    llm_justified --> enriched : is_relevant=true
-    llm_justified --> expired : is_relevant=false (24h)
+    news_sampled --> enriched : is_relevant=true (1 LLM call)
+    news_sampled --> expired : is_relevant=false (1 LLM call)
+    news_sampled --> failed : LLM permanent failure
     enriched --> expired : stale > 6h
-    enriched --> failed_keyword : LLM permanent failure
-    news_sampled --> failed_keyword : LLM permanent failure
-    failed_keyword --> raw : expiry retry (30 min)
+    expired --> raw : expiry retry (30 min)
 
     note right of raw
         Status values:
         raw, news_sampled,
-        llm_justified,
         enriched, expired, failed
     end note
 ```
@@ -154,7 +143,7 @@ erDiagram
         text source "NOT NULL, CHECK (trends24|google_trends)"
         int rank "nullable"
         timestamptz scraped_at "NOT NULL, DEFAULT NOW()"
-        text status "NOT NULL, CHECK (raw|news_sampled|llm_justified|enriched|expired|failed)"
+        text status "NOT NULL, CHECK (raw|news_sampled|enriched|expired|failed)"
         text failure_reason "nullable"
         timestamptz updated_at "NOT NULL, auto-updated"
     }
@@ -316,44 +305,27 @@ graph TD
 
 ---
 
-## 7. LLM Service — Justifier & Enricher Flow
+## 7. LLM Service — Combined Processor Flow
 
 ```mermaid
 graph TD
-    subgraph "Phase 1: Justifier"
-        J_POLL["SELECT status=news_sampled\nbatch_size=10\nFOR UPDATE SKIP LOCKED"]
-        J_ART["build_article_context()\ntruncate articles to token limit"]
-        J_PROMPT["JUSTIFIER_SYSTEM prompt\n+ article context"]
-        J_CALL["OpenRouter API\nPOST /chat/completions"]
-        J_RESP["Parse {is_relevant: bool, justification: str}"]
-        J_RESP -->|valid| J_UPSERT["UPSERT keyword_justifications\nis_relevant, justification, llm_model, processed_at"]
-        J_UPSERT --> J_STATUS["UPDATE keyword.status\n= 'llm_justified'"]
-        J_STATUS --> J_NEXT["Next keyword"]
-        J_RESP -->|parse error| J_FALLBACK["fallback is_relevant=false"]
-        J_FALLBACK --> J_FAIL["UPDATE keyword.status\n= 'failed'\nfailure_reason=LLM_PARSE_ERROR"]
-        J_CALL -->|429/5xx after 3 retries| J_ERR["LLMError → set status=failed\nfailure_reason=LLM_PERMANENT_FAILURE"]
-    end
+    P_POLL["SELECT status=news_sampled\nbatch_size=10\nFOR UPDATE SKIP LOCKED"]
+    P_BUILD["build_article_context()\ntruncate articles to token limit"]
+    P_PROMPT["COMBINED_SYSTEM prompt\n(justify + enrich in one call)"]
+    P_CALL["OpenRouter API\nPOST /chat/completions"]
+    P_PARSE["Parse {is_relevant, justification,\nexpanded_keywords?}"]
+    P_PARSE -->|is_relevant=true| P_JUST_UPSERT["UPSERT keyword_justifications\n(is_relevant, justification, llm_model)"]
+    P_JUST_UPSERT --> P_ENRICH_UPSERT["UPSERT keyword_enrichments\nexpanded_keywords (JSONB)"]
+    P_ENRICH_UPSERT --> P_ENRICHED["UPDATE keyword.status\n= 'enriched'"]
+    P_PARSE -->|is_relevant=false| P_JUST_UPSERT2["UPSERT keyword_justifications\n(is_relevant, justification, llm_model)"]
+    P_JUST_UPSERT2 --> P_EXPIRED["UPDATE keyword.status\n= 'expired'"]
+    P_CALL -->|429/5xx after 3 retries| P_ERR["LLMError → set status=failed\nfailure_reason=LLM_PERMANENT_FAILURE"]
+    P_PARSE -->|parse error × 2| P_PARSE_ERR["fallback: is_relevant=false\nkeyword.status='expired'"]
 
-    subgraph "Phase 2: Enricher"
-        E_POLL["SELECT status=llm_justified\n+ keyword_justifications.is_relevant=true\nFOR UPDATE SKIP LOCKED"]
-        E_BUILD["build_article_context()\ntruncate articles"]
-        E_PROMPT["ENRICHER_SYSTEM prompt\n+ article context"]
-        E_CALL["OpenRouter API\nPOST /chat/completions"]
-        E_RESP["Parse {expanded_keywords: list[str]}"]
-        E_RESP -->|valid| E_UPSERT["UPSERT keyword_enrichments\nexpanded_keywords (JSONB), llm_model, processed_at"]
-        E_UPSERT --> E_STATUS["UPDATE keyword.status\n= 'enriched'"]
-        E_STATUS --> E_NEXT["Next keyword"]
-        E_RESP -->|parse error| E_FALLBACK["fallback expanded=[keyword.keyword]"]
-        E_FALLBACK --> E_STATUS
-        E_CALL -->|429/5xx after 3 retries| E_ERR["LLMError → set status=failed"]
-    end
+    P_POLL --> P_BUILD --> P_PROMPT --> P_CALL --> P_PARSE
 
-    J_NEXT --> E_POLL
-
-    style J_POLL fill:#2d6a4f,color:#fff
-    style E_POLL fill:#2d6a4f,color:#fff
-    style J_CALL fill:#e63946,color:#fff
-    style E_CALL fill:#e63946,color:#fff
+    style P_POLL fill:#2d6a4f,color:#fff
+    style P_CALL fill:#e63946,color:#fff
 ```
 
 ---
@@ -371,8 +343,8 @@ graph TD
         P1_CHECK -->|no| P1_SKIP["Skip — still fresh"]
     end
 
-    subgraph "Pass 2: Irrelevant Justified"
-        P2["SELECT status=llm_justified\nJOIN keyword_justifications\nWHERE is_relevant=false"]
+    subgraph "Pass 2: Irrelevant Keywords"
+        P2["SELECT status NOT IN (expired,failed)\nJOIN keyword_justifications\nWHERE is_relevant=false"]
         P2 --> P2_CHECK{"keyword_justifications.processed_at\nvs now > 24 hours?"}
         P2_CHECK -->|yes| P2_EXP["UPDATE keyword.status\n= 'expired'"]
         P2_CHECK -->|no| P2_SKIP["Skip — too recent"]
@@ -551,18 +523,12 @@ flowchart LR
         KW_SAMPLED["keywords: news_sampled"]
     end
 
-    subgraph "3. Justify (LLM)"
-        JUST["LLM Justifier\npoll: status=news_sampled"]
-        OR1["OpenRouter\n{is_relevant, justification}"]
+    subgraph "3. Justify + Enrich (LLM, 1 call)"
+        JUST["LLM Processor\npoll: status=news_sampled"]
+        OR1["OpenRouter\n{is_relevant, justification,\nexpanded_keywords}"]
         JUSTIF["keyword_justifications"]
-        KW_JUST["keywords: llm_justified"]
-    end
-
-    subgraph "4. Enrich (LLM)"
-        ENRICH["LLM Enricher\npoll: llm_justified\n+ is_relevant=true"]
-        OR2["OpenRouter\n{expanded_keywords}"]
         ENRCH["keyword_enrichments"]
-        KW_ENR["keywords: enriched"]
+        KW_JUST["keywords: enriched\n(if relevant) or expired"]
     end
 
     subgraph "5. Expire (Cron)"
@@ -591,22 +557,19 @@ flowchart LR
     KW_SAMPLED --> JUST
     JUST --> OR1
     OR1 --> JUSTIF
+    OR1 --> ENRCH
     JUSTIF --> KW_JUST
-    KW_JUST --> ENRICH
-    ENRICH --> OR2
-    OR2 --> ENRCH
-    ENRCH --> KW_ENR
-    KW_ENR --> EXP
+    ENRCH --> KW_JUST
+    KW_JUST --> EXP
     EXP --> E1 & E2 & E3
     E1 & E2 & E3 --> KW_EXP
-    KW_ENR --> API_ENRICH
+    KW_JUST -->|"GET /keywords/enriched"| API_ENRICH
     API_ENRICH --> T4
 
     style SCH fill:#e63946,color:#fff
     style T4 fill:#e63946,color:#fff
     style KW_RAW fill:#2d6a4f,color:#fff
     style KW_SAMPLED fill:#40916c,color:#fff
-    style KW_JUST fill:#52b788,color:#fff
-    style KW_ENR fill:#74c69d,color:#000
+    style KW_JUST fill:#74c69d,color:#000
     style KW_EXP fill:#95d5b2,color:#000
 ```

@@ -28,7 +28,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```
 
 - **Stateless services**: All state lives in PostgreSQL only
-- **Keyword lifecycle**: Driven by `status` column (raw → news_sampled → llm_justified → enriched → expired/failed)
+- **Keyword lifecycle**: Driven by `status` column (raw → news_sampled → enriched | expired | failed)
 - **Concurrency**: All polling queries use `SELECT FOR UPDATE SKIP LOCKED` to prevent race conditions
 - **Scraper trigger**: `POST /pipeline/trigger` writes a ScrapeRun row; Scraper service polls and executes
 
@@ -128,7 +128,7 @@ All read from `.env` via `python-dotenv`. Never hardcode. Key vars:
 │   │   ├── delta.py
 │   │   └── main.py       # Entry point (polls ScrapeRun table)
 │   ├── sampler/          # Crawls detik/kompas/tribun news sites
-│   ├── llm/             # OpenRouter justifier + enricher
+│   ├── llm/             # OpenRouter processor (combined justification + enrichment)
 │   ├── expiry/          # APScheduler cleanup job
 │   ├── api/             # FastAPI REST API
 │   └── demo/            # Streamlit read-only dashboard (radio-button nav via dashboard_pages/)
@@ -145,8 +145,7 @@ All read from `.env` via `python-dotenv`. Never hardcode. Key vars:
 | Scraper | `ScrapeRun` rows with `status=running` | Keywords with `status=raw` in PostgreSQL |
 | API | — | REST API. Creates ScrapeRun rows; `POST /pipeline/trigger` enqueues scrape jobs. |
 | Sampler | `status=raw` | Articles, sets `status=news_sampled` |
-| LLM (Justifier) | `status=news_sampled` | KeywordJustification, sets `status=llm_justified` |
-| LLM (Enricher) | `status=llm_justified` + `is_relevant=true` | KeywordEnrichment, sets `status=enriched` |
+| LLM (processor) | `status=news_sampled` | KeywordJustification + KeywordEnrichment; sets `status=enriched` (relevant) or `status=expired` (not relevant) |
 | Expiry | 3-pass cron (30 min) | Sets `status=expired` or `status=raw` (retry) |
 
 ## API Endpoints
