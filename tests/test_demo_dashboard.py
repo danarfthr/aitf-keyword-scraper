@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from services.demo.pages._models import (
+from services.demo.dashboard_pages._models import (
     HealthData,
     KeywordItem,
     StuckAlert,
@@ -15,16 +15,16 @@ from services.demo.pages._models import (
     ArticleItem,
     JustificationItem,
 )
-from services.demo.pages._theme import STATUS_COLORS, RELEVANCE_COLORS, SOURCE_COLORS, ALERT_COLORS
-from services.demo.pages.components._freshness_indicator import render_freshness_indicator
-from services.demo.pages.components._status_badge import render_status_badge, render_source_badge
+from services.demo.dashboard_pages._theme import STATUS_COLORS, RELEVANCE_COLORS, SOURCE_COLORS, ALERT_COLORS
+from services.demo.dashboard_pages.components._freshness_indicator import render_freshness_indicator
+from services.demo.dashboard_pages.components._status_badge import render_status_badge, render_source_badge
 
 
 # ── Model tests ───────────────────────────────────────────────────────────────
 
 class TestHealthData:
     def test_health_data_creation(self):
-        from services.demo.pages._models import ScrapeRun
+        from services.demo.dashboard_pages._models import ScrapeRun
         scrape = ScrapeRun(
             scrape_run_id=1,
             source="trends24",
@@ -114,7 +114,7 @@ class TestKeywordDetail:
 class TestThemeColors:
     def test_all_statuses_have_colors(self):
         from services.demo.pages._models import HealthData
-        from services.demo.pages._models import ScrapeRun
+        from services.demo.dashboard_pages._models import ScrapeRun
         # All statuses from KeywordStatus.ALL should have a color defined
         all_statuses = ["raw", "news_sampled", "llm_justified", "enriched", "expired", "failed"]
         for status in all_statuses:
@@ -150,7 +150,7 @@ class TestStatusBadge:
 
 class TestAPIClientShapes:
     def test_health_data_fields(self):
-        from services.demo.pages._models import ScrapeRun
+        from services.demo.dashboard_pages._models import ScrapeRun
         health = HealthData(
             counts={},
             last_scrape=None,

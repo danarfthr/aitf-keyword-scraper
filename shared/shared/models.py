@@ -16,7 +16,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
-from .constants import KeywordStatus
+from .constants import KeywordStatus, KeywordSource, ArticleSource, ARTICLE_SOURCES
 
 
 class Base(DeclarativeBase):
@@ -29,7 +29,7 @@ class Keyword(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     keyword: Mapped[str] = mapped_column(Text, nullable=False)
     source: Mapped[str] = mapped_column(
-        Text, CheckConstraint("source IN ('trends24', 'google_trends')"), nullable=False
+        Text, CheckConstraint(f"source IN ('{KeywordSource.TRENDS24}', '{KeywordSource.GOOGLE_TRENDS}')"), nullable=False
     )
     rank: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     scraped_at: Mapped[datetime] = mapped_column(
@@ -69,7 +69,9 @@ class Article(Base):
         Integer, ForeignKey("keywords.id", ondelete="CASCADE"), nullable=False
     )
     source_site: Mapped[str] = mapped_column(
-        Text, CheckConstraint("source_site IN ('detik', 'kompas', 'tribun')"), nullable=False
+        Text, CheckConstraint(
+            f"source_site IN ({', '.join(repr(s) for s in ARTICLE_SOURCES)})"
+        ), nullable=False
     )
     url: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     title: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
