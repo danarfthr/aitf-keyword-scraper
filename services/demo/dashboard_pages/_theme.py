@@ -22,7 +22,6 @@ COLORS = {
 STATUS_COLORS = {
     "raw": "#94a3b8",          # slate
     "news_sampled": "#38bdf8", # sky blue
-    "llm_justified": "#a07ef5",# purple
     "enriched": "#4ade80",     # green
     "expired": "#fbbf24",      # amber
     "failed": "#f87171",       # red

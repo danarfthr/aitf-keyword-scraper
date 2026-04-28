@@ -14,8 +14,7 @@ from dashboard_pages.components._status_badge import render_status_badge, render
 
 _STATUS_HINTS = {
     "raw": "Scraped from Google Trends or Trends24 — awaiting news sampling.",
-    "news_sampled": "News articles sampled from detik/kompas/tribun — awaiting LLM justification.",
-    "llm_justified": "LLM assessed government relevance — awaiting enrichment if is_relevant=true.",
+    "news_sampled": "News articles sampled from detik/kompas/tribun — awaiting LLM processing.",
     "enriched": "Enrichment complete — keyword is ready for Team 4.",
     "failed": "LLM processing failed — will auto-retry after 30 min cooldown.",
     "expired": "No longer trending — archived after 24h of inactivity.",

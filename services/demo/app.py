@@ -76,8 +76,8 @@ if selected_name == "Pipeline Overview":
 elif selected_name == "Trending Keywords":
     from dashboard_pages import p02_trending_keywords as m
     m.render()
-elif selected_name == "Relevance Results":
-    from dashboard_pages import p03_relevance_results as m
+elif selected_name == "LLM Decisions":
+    from dashboard_pages import p03_llm_decisions as m
     m.render()
 elif selected_name == "Enriched Keywords":
     from dashboard_pages import p04_enriched_keywords as m

@@ -39,7 +39,7 @@ def render():
 
     k1, k2, k3, k4, k5 = st.columns(5)
     k1.metric("Total Keywords", total)
-    k2.metric("In Progress", in_progress, help="Keywords in active stages: raw + news_sampled + llm_justified. Not yet enriched or failed.")
+    k2.metric("In Progress", in_progress, help="Keywords in active stages: raw + news_sampled. Not yet enriched, expired, or failed.")
     k3.metric("Enriched", enriched, help="Ready for Team 4 — passed LLM justification and enrichment.")
     k4.metric("Failed", failed, help="Auto-retry after 30 min cooldown. Check service logs if failures persist.")
     k5.metric("Expired", health.counts.get("expired", 0), help="No longer trending — archived automatically after 24h inactivity.")
