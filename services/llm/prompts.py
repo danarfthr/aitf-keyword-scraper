@@ -1,49 +1,26 @@
-"""LLM prompt templates for the justifier and enricher modules."""
+"""LLM prompt templates for the combined justifier+enricher processor."""
 
 from shared.shared.constants import SUMMARY_CHAR_THRESHOLD
 
 
-JUSTIFIER_SYSTEM = """
-You are a content relevance classifier for a government issue monitoring system
-operated by the Indonesian Ministry of Communication and Informatics (Komdigi).
+COMBINED_SYSTEM = """
+You are a content relevance and keyword expansion assistant for a government
+issue monitoring system operated by the Indonesian Ministry of Communication
+and Informatics (Komdigi).
 
-Your task: determine whether a trending keyword is related to Indonesian government
-affairs. Relevant topics include: ministry activities, public policy, regulations,
-government programs, state-owned enterprises (BUMN), parliamentary proceedings,
-court rulings affecting public policy, or government-linked institutions.
+You will receive a keyword and sample news articles about it.
 
-You will receive a keyword and samples of news articles about it.
-Base your decision on the article content, not just the keyword text alone.
+Step 1 — RELEVANCE: Determine whether this keyword topic is related to
+Indonesian government affairs. Relevant topics include: ministry activities,
+public policy, regulations, government programs, state-owned enterprises (BUMN),
+parliamentary proceedings, court rulings affecting public policy, or
+government-linked institutions. Base your decision on the article content,
+not just the keyword text alone.
 
-Respond ONLY with a valid JSON object. No text before or after the JSON.
+Step 2 — EXPANSION: If relevant, generate related search keywords that will
+help a crawler find more government-relevant articles on the same topic.
 
-Format when relevant:
-{"is_relevant": true, "justification": "<reason in Indonesian, max 2 sentences>"}
-
-Format when not relevant:
-{"is_relevant": false, "justification": "<reason in Indonesian, max 2 sentences>"}
-"""
-
-
-def build_justifier_prompt(keyword: str, article_context: str) -> str:
-    """Build the user message for the justifier LLM call."""
-    return f"""Keyword trending: {keyword}
-
-Sampel artikel:
-{article_context}
-
-Apakah keyword ini berkaitan dengan isu pemerintahan Indonesia?"""
-
-
-ENRICHER_SYSTEM = """
-You are a keyword expansion assistant for a government issue monitoring system
-operated by the Indonesian Ministry of Communication and Informatics (Komdigi).
-
-Your task: given a trending keyword and sample news articles about it, generate
-related search keywords that will help a crawler find more government-relevant
-articles on the same topic.
-
-Rules:
+Rules for expansion:
 - Generate 5 to 10 expanded keywords.
 - All keywords must be in Indonesian.
 - Base keywords strictly on the article content — do not invent unrelated terms.
@@ -53,19 +30,23 @@ Rules:
 
 Respond ONLY with a valid JSON object. No text before or after the JSON.
 
-Format:
-{"expanded_keywords": ["keyword1", "keyword2", "keyword3"]}
+Format when not relevant:
+{"is_relevant": false, "justification": "<reason in Indonesian, max 2 sentences>"}
+
+Format when relevant:
+{"is_relevant": true, "justification": "<reason in Indonesian, max 2 sentences>", "expanded_keywords": ["keyword1", "keyword2", "keyword3"]}
 """
 
 
-def build_enricher_prompt(keyword: str, article_context: str) -> str:
-    """Build the user message for the enricher LLM call."""
-    return f"""Keyword utama: {keyword}
+def build_combined_prompt(keyword: str, article_context: str) -> str:
+    """Build the user message for the combined justification+enrichment LLM call."""
+    return f"""Keyword trending: {keyword}
 
 Sampel artikel:
 {article_context}
 
-Hasilkan keyword pencarian yang relevan berdasarkan artikel di atas."""
+Tahap 1 — Apakah keyword ini berkaitan dengan isu pemerintahan Indonesia?
+Tahap 2 — Jika ya, hasilkan keyword pencarian tambahan yang relevan."""
 
 
 def build_article_context(articles: list) -> str:

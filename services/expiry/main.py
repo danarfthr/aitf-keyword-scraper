@@ -50,12 +50,14 @@ async def run_expiry_job():
                             kw.status = KeywordStatus.EXPIRED
                             expired_stale += 1
 
-            # Pass 2 - Expire irrelevant justified keywords
+            # Pass 2 - Expire keywords deemed irrelevant but not yet expired
+            # Safety net for old pre-merge LLM_JUSTIFIED rows; new flow sets
+            # status=expired immediately on is_relevant=false so this rarely fires.
             async with session.begin():
                 result = await session.execute(
                     select(Keyword)
                     .join(KeywordJustification)
-                    .where(Keyword.status == KeywordStatus.LLM_JUSTIFIED)
+                    .where(Keyword.status.notin_([KeywordStatus.EXPIRED, KeywordStatus.FAILED]))
                     .where(KeywordJustification.is_relevant == False)
                     .with_for_update(skip_locked=True)
                 )

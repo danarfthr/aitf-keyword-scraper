@@ -39,8 +39,8 @@ class Keyword(Base):
         Text,
         CheckConstraint(
             f"status IN ('{KeywordStatus.RAW}', '{KeywordStatus.NEWS_SAMPLED}', "
-            f"'{KeywordStatus.LLM_JUSTIFIED}', '{KeywordStatus.ENRICHED}', "
-            f"'{KeywordStatus.EXPIRED}', '{KeywordStatus.FAILED}')"
+            f"'{KeywordStatus.ENRICHED}', '{KeywordStatus.EXPIRED}', "
+            f"'{KeywordStatus.FAILED}')"
         ),
         server_default=KeywordStatus.RAW,
         nullable=False,

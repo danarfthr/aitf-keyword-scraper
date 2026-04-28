@@ -92,7 +92,6 @@ async def get_stuck_keywords():
         non_terminal = [
             KeywordStatus.RAW,
             KeywordStatus.NEWS_SAMPLED,
-            KeywordStatus.LLM_JUSTIFIED,
         ]
 
         for status in non_terminal:

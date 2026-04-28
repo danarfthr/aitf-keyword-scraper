@@ -2,14 +2,13 @@
 
 
 class KeywordStatus:
-    RAW           = "raw"
-    NEWS_SAMPLED  = "news_sampled"
-    LLM_JUSTIFIED = "llm_justified"
-    ENRICHED      = "enriched"
-    EXPIRED       = "expired"
-    FAILED        = "failed"
+    RAW          = "raw"
+    NEWS_SAMPLED = "news_sampled"
+    ENRICHED     = "enriched"
+    EXPIRED      = "expired"
+    FAILED       = "failed"
 
-    ALL = [RAW, NEWS_SAMPLED, LLM_JUSTIFIED, ENRICHED, EXPIRED, FAILED]
+    ALL = [RAW, NEWS_SAMPLED, ENRICHED, EXPIRED, FAILED]
 
 
 class KeywordSource:
