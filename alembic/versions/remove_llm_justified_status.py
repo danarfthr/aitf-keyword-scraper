@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 revision = 'remove_llm_justified_status'
-down_revision = '3dac2b7d80bb_initial_schema'
+down_revision = '3dac2b7d80bb'
 branch_labels = None
 depends_on = None
 
