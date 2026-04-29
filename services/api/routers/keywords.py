@@ -211,6 +211,7 @@ async def get_keywords_by_status(
                     rank=kw.rank,
                     scraped_at=kw.scraped_at.isoformat() if kw.scraped_at else "",
                     expanded_keywords=[],
+                    status=kw.status,
                     is_relevant=is_rel,
                 )
             )
@@ -292,6 +293,7 @@ async def get_all_keywords(
                     rank=kw.rank,
                     scraped_at=kw.scraped_at.isoformat() if kw.scraped_at else "",
                     expanded_keywords=[],
+                    status=kw.status,
                     is_relevant=is_rel,
                 )
             )

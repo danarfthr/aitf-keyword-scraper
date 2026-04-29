@@ -176,7 +176,7 @@ def get_all_keywords(
                 source=it["source"],
                 rank=it.get("rank"),
                 scraped_at=it.get("scraped_at", ""),
-                status="",
+                status=it.get("status", ""),
                 expanded_keywords=it.get("expanded_keywords", []),
                 is_relevant=it.get("is_relevant"),
             )

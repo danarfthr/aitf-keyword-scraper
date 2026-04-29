@@ -111,11 +111,4 @@ def render():
 
 
 def _infer_status(item) -> str:
-    """Infer status from is_relevant and presence of data."""
-    if item.status:
-        return item.status
-    if item.is_relevant is True:
-        return "enriched"
-    if item.is_relevant is False:
-        return "expired"
-    return "unknown"
+    return item.status or "unknown"

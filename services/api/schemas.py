@@ -35,7 +35,8 @@ class EnrichedKeywordItem(BaseModel):
     rank: Optional[int]
     scraped_at: str
     expanded_keywords: list[str]
-    is_relevant: Optional[bool] = None  # Only populated when include_relevant=true on llm_justified
+    status: Optional[str] = None
+    is_relevant: Optional[bool] = None
 
 
 class EnrichedListResponse(BaseModel):
