@@ -1,4 +1,4 @@
-"""LLM Decisions page — single LLM call: justification + enrichment for news_sampled keywords."""
+"""LLM Decisions & Enriched — unified view of all LLM-processed keywords."""
 
 import os
 import sys as _sys
@@ -11,10 +11,9 @@ import streamlit as st
 
 from datetime import datetime, timedelta, timezone
 
-from dashboard_pages._api import get_keywords_by_status, format_wib
-from dashboard_pages._theme import inject_theme, RELEVANCE_COLORS, COLORS
+from dashboard_pages._api import get_all_keywords, format_wib
+from dashboard_pages._theme import inject_theme, COLORS
 from dashboard_pages.components._freshness_indicator import render_freshness_indicator
-from dashboard_pages.components._status_badge import render_status_badge, render_source_badge
 from dashboard_pages.components._detail_expander import render_keyword_detail_expander
 
 
@@ -28,15 +27,19 @@ DATE_PRESETS = {
 
 def render():
     inject_theme()
-    st.title("LLM Decisions")
+    st.title("LLM Decisions & Enriched")
     st.caption(
-        "Single LLM call per keyword: determines government relevance and generates "
-        "expanded search terms in one step. Relevant keywords proceed to enrichment; "
-        "not-relevant keywords are marked expired."
+        "All keywords that have passed through LLM processing — relevant (enriched) and not-relevant (expired) outcomes in one unified view."
     )
 
     # ── Filters ────────────────────────────────────────────────────────────────
-    c_relevance, c_date, c_src = st.columns([1, 2, 1])
+    c_status, c_relevance, c_date, c_src = st.columns([1, 1, 2, 1])
+
+    with c_status:
+        status_filter = st.selectbox(
+            "Status",
+            ["All", "news_sampled", "enriched", "expired", "failed"],
+        )
     with c_relevance:
         relevance_filter = st.selectbox(
             "Relevance",
@@ -55,11 +58,17 @@ def render():
 
     src_filter = source if source != "All" else None
 
-    # ── Fetch with include_relevant=true ───────────────────────────────────────
+    # Determine status param for API call
+    if status_filter == "All":
+        status_param = "news_sampled,enriched,expired,failed"
+    else:
+        status_param = status_filter
+
+    # ── Fetch ─────────────────────────────────────────────────────────────────
     with st.spinner("Loading LLM decisions…"):
-        items, fetched_at = get_keywords_by_status(
-            "news_sampled",
-            limit=300,
+        items, fetched_at = get_all_keywords(
+            status=status_param,
+            limit=500,
             since=since,
             source=src_filter,
             include_relevant=True,
@@ -67,7 +76,7 @@ def render():
 
     render_freshness_indicator(fetched_at)
 
-    # ── Aggregate stats ───────────────────────────────────────────────────────
+    # ── Stats ────────────────────────────────────────────────────────────────
     total = len(items)
     relevant_count = sum(1 for it in items if it.is_relevant is True)
     not_relevant_count = sum(1 for it in items if it.is_relevant is False)
@@ -81,7 +90,7 @@ def render():
 
     st.divider()
 
-    # ── Apply relevance filter ─────────────────────────────────────────────────
+    # ── Apply relevance filter ────────────────────────────────────────────────
     if relevance_filter == "Relevant only":
         items = [it for it in items if it.is_relevant is True]
     elif relevance_filter == "Not relevant":
@@ -95,7 +104,11 @@ def render():
                 "Keyword": it.keyword,
                 "Source": it.source,
                 "Rank": it.rank or "—",
-                "Relevance": "YES" if it.is_relevant is True else ("NO" if it.is_relevant is False else "—"),
+                "Status": it.status or "unknown",
+                "Relevant": (
+                    "YES" if it.is_relevant is True else
+                    "NO" if it.is_relevant is False else "—"
+                ),
                 "Scraped At (WIB)": format_wib(it.scraped_at),
             })
         df = pd.DataFrame(rows)

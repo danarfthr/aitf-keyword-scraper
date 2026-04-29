@@ -14,7 +14,7 @@ graph TB
         T4["Team 4\n(Consumer)"]
     end
 
-    subgraph "keyword-scraper-2"
+    subgraph "keyword-scraper-3"
         subgraph "services/api"["API Service (FastAPI :8000)"]
             API["FastAPI App"]
             SCR["Scraper Library\n(BackgroundTask)"]
@@ -42,10 +42,9 @@ graph TB
             ST["Streamlit App\n(Read-only, no DB access)"]
             P01["P01 Pipeline Overview"]
             P02["P02 Trending Keywords"]
-            P03["P03 LLM Decisions"]
-            P04["P04 Enriched Keywords"]
-            P05["P05 Failed Keywords"]
-            P06["P06 All Keywords"]
+            P03["P03 LLM Decisions & Enriched"]
+            P04["P04 Failed Keywords"]
+            P05["P05 All Keywords"]
         end
 
         subgraph "PostgreSQL"
@@ -87,7 +86,7 @@ graph TB
     EXP --> EXP_HB
 
     %% Demo reads via API
-    ST -->|"GET /keywords/enriched"| API
+    ST -->|"GET /keywords/all"| API
     ST -->|"GET /pipeline/health"| API
     ST --> P01
     ST --> P02
@@ -240,9 +239,9 @@ graph LR
         HLTH["/health → keyword counts + scrape_runs"]
         STCK["/stuck → stuck alerts + throughput"]
         ENRCH["/enriched → paginated enriched keywords"]
+        ALL_EP["/all → all keywords with status/source/search filters"]
         DTL["/{id} → full detail + articles + justification + enrichment"]
         STAT["/status/{status} → filter by status/source/since"]
-        ALL_EP["/all → all keywords with status/source/search filters"]
         RTRY["/retry-failed → UPDATE failed → raw"]
     end
 
@@ -430,10 +429,9 @@ graph TD
 
     NAV -->|"Option 1"| P01["P01 Pipeline Overview"]
     NAV -->|"Option 2"| P02["P02 Trending Keywords"]
-    NAV -->|"Option 3"| P03["P03 LLM Decisions"]
-    NAV -->|"Option 4"| P04["P04 Enriched Keywords"]
-    NAV -->|"Option 5"| P05["P05 Failed Keywords"]
-    NAV -->|"Option 6"| P06["P06 All Keywords"]
+    NAV -->|"Option 3"| P03["P03 LLM Decisions & Enriched"]
+    NAV -->|"Option 4"| P04["P04 Failed Keywords"]
+    NAV -->|"Option 5"| P05["P05 All Keywords"]
 
     subgraph "Shared Components"
         API["_api.py\nhttpx client → FastAPI"]
@@ -447,23 +445,21 @@ graph TD
     P03 --> API
     P04 --> API
     P05 --> API
-    P06 --> API
 
     P01 --> MODELS
     P02 --> MODELS
     P03 --> MODELS
     P04 --> MODELS
     P05 --> MODELS
-    P06 --> MODELS
 
     P01 --> CMPS
     P02 --> CMPS
     P03 --> CMPS
     P04 --> CMPS
     P05 --> CMPS
-    P06 --> CMPS
 
     API -->|"GET /pipeline/health"| FP["FastAPI (:8000)"]
+    API -->|"GET /keywords/all"| FP
     API -->|"GET /keywords/enriched"| FP
     API -->|"GET /keywords/status/{status}"| FP
 
@@ -482,21 +478,23 @@ graph TD
     end
     P02 --> F2 & F3
 
-    subgraph "P03 Color Coding"
-        C3["is_relevant=true → green"]
-        C4["is_relevant=false → red/orange"]
+    subgraph "P03 Unified Table"
+        C3["Status filter\n(news_sampled/enriched/expired/failed)"]
+        C4["Relevance filter\n(All/Relevant/Not relevant)"]
+        T3["Combined table with\nstatus + relevance columns"]
     end
-    P03 --> C3 & C4
+    P03 --> C3 & C4 & T3
 
-    subgraph "P04 Chips"
-        C4["expanded_keywords\ndisplayed as chips/tags"]
+    subgraph "P04 Details"
+        F4["failure_reason displayed\nfor each failed keyword"]
     end
-    P04 --> C4
+    P04 --> F4
 
-    subgraph "P05 Details"
-        F5["failure_reason displayed\nfor each failed keyword"]
+    subgraph "P05 All Keywords"
+        F5["Status multiselect\n(source, date, search filters)"]
+        T5["Full table with status column\n+ per-keyword detail expander"]
     end
-    P05 --> F5
+    P05 --> F5 & T5
 
     style ST fill:#1d3557,color:#fff
     style API fill:#2d6a4f,color:#fff
