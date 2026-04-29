@@ -1,7 +1,7 @@
 """Keyword endpoints — public access, no auth required."""
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Any
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -194,34 +194,106 @@ async def get_keywords_by_status(
 
         items = []
         for kw in keywords:
-            if include_relevant and status == KeywordStatus.LLM_JUSTIFIED:
+            is_rel = None
+            if include_relevant:
                 just_stmt = select(KeywordJustification).where(
                     KeywordJustification.keyword_id == kw.id
                 )
                 just_result = await session.execute(just_stmt)
                 justification = just_result.scalar_one_or_none()
                 is_rel = justification.is_relevant if justification else None
-                items.append(
-                    EnrichedKeywordItem(
-                        id=kw.id,
-                        keyword=kw.keyword,
-                        source=kw.source,
-                        rank=kw.rank,
-                        scraped_at=kw.scraped_at.isoformat() if kw.scraped_at else "",
-                        expanded_keywords=[],
-                        is_relevant=is_rel,
-                    )
+
+            items.append(
+                EnrichedKeywordItem(
+                    id=kw.id,
+                    keyword=kw.keyword,
+                    source=kw.source,
+                    rank=kw.rank,
+                    scraped_at=kw.scraped_at.isoformat() if kw.scraped_at else "",
+                    expanded_keywords=[],
+                    is_relevant=is_rel,
                 )
-            else:
-                items.append(
-                    EnrichedKeywordItem(
-                        id=kw.id,
-                        keyword=kw.keyword,
-                        source=kw.source,
-                        rank=kw.rank,
-                        scraped_at=kw.scraped_at.isoformat() if kw.scraped_at else "",
-                        expanded_keywords=[],
+            )
+
+        return EnrichedListResponse(total=total, limit=limit, offset=offset, items=items)
+
+
+@router.get("/all", response_model=EnrichedListResponse)
+async def get_all_keywords(
+    status: str = Query(default="all", description="Comma-separated statuses or 'all'"),
+    since: Optional[str] = Query(default=None, description="ISO timestamp — only keywords scraped after this time"),
+    source: Optional[str] = Query(default=None, description="Filter by source: trends24 or google_trends"),
+    search: Optional[str] = Query(default=None, description="Keyword text substring match"),
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    include_relevant: bool = Query(default=False, description="Join justification table to include is_relevant field"),
+):
+    """GET /keywords/all — All keywords across every status with filtering."""
+    async with get_session() as session:
+        # Build conditions
+        conditions: list[Any] = []
+
+        if status != "all":
+            statuses = [s.strip() for s in status.split(",")]
+            for s in statuses:
+                if s not in KeywordStatus.ALL:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Invalid status '{s}'. Must be one of: {KeywordStatus.ALL}",
                     )
+            conditions.append(Keyword.status.in_(statuses))
+        # else: no status filter — all statuses
+
+        if since:
+            try:
+                since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
+                conditions.append(Keyword.scraped_at >= since_dt)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid since timestamp format")
+
+        if source:
+            if source not in KeywordSource.ALL:
+                raise HTTPException(status_code=400, detail="source must be trends24 or google_trends")
+            conditions.append(Keyword.source == source)
+
+        if search:
+            conditions.append(Keyword.keyword.ilike(f"%{search}%"))
+
+        count_stmt = select(func.count()).select_from(Keyword).where(*conditions)
+        total_result = await session.execute(count_stmt)
+        total = total_result.scalar() or 0
+
+        stmt = (
+            select(Keyword)
+            .where(*conditions)
+            .order_by(Keyword.scraped_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        result = await session.execute(stmt)
+        keywords = result.scalars().all()
+
+        items = []
+        for kw in keywords:
+            is_rel = None
+            if include_relevant:
+                just_stmt = select(KeywordJustification).where(
+                    KeywordJustification.keyword_id == kw.id
                 )
+                just_result = await session.execute(just_stmt)
+                justification = just_result.scalar_one_or_none()
+                is_rel = justification.is_relevant if justification else None
+
+            items.append(
+                EnrichedKeywordItem(
+                    id=kw.id,
+                    keyword=kw.keyword,
+                    source=kw.source,
+                    rank=kw.rank,
+                    scraped_at=kw.scraped_at.isoformat() if kw.scraped_at else "",
+                    expanded_keywords=[],
+                    is_relevant=is_rel,
+                )
+            )
 
         return EnrichedListResponse(total=total, limit=limit, offset=offset, items=items)

@@ -147,6 +147,43 @@ def get_keywords_by_status(
     return items, fetched_at
 
 
+def get_all_keywords(
+    status: str = "all",
+    limit: int = 200,
+    since: str | None = None,
+    source: str | None = None,
+    search: str | None = None,
+    include_relevant: bool = False,
+) -> tuple[list[KeywordItem], float]:
+    params: dict[str, Any] = {"limit": limit, "status": status}
+    if since:
+        params["since"] = since
+    if source:
+        params["source"] = source
+    if search:
+        params["search"] = search
+    if include_relevant:
+        params["include_relevant"] = "true"
+
+    raw = _get("/keywords/all", params)
+    fetched_at = _now()
+    items = []
+    for it in raw.get("items", []):
+        items.append(
+            KeywordItem(
+                id=it["id"],
+                keyword=it["keyword"],
+                source=it["source"],
+                rank=it.get("rank"),
+                scraped_at=it.get("scraped_at", ""),
+                status="",
+                expanded_keywords=it.get("expanded_keywords", []),
+                is_relevant=it.get("is_relevant"),
+            )
+        )
+    return items, fetched_at
+
+
 def get_enriched(
     limit: int = 200,
     since: str | None = None,

@@ -57,6 +57,34 @@ GET /keywords/enriched
 }
 ```
 
+Dashboard operators can browse all keywords across every status via:
+
+```bash
+# Get all keywords with optional filters
+GET /keywords/all?status=all&source=trends24&search=BBM&limit=50
+
+# Get expired/archived keywords only
+GET /keywords/all?status=expired&limit=200
+
+# Response shape (same as /keywords/enriched):
+{
+  "total": 450,
+  "limit": 50,
+  "offset": 0,
+  "items": [
+    {
+      "id": 2,
+      "keyword": "BBM naik",
+      "source": "trends24",
+      "rank": 5,
+      "scraped_at": "2026-04-09T10:00:00Z",
+      "expanded_keywords": [],
+      "is_relevant": true
+    }
+  ]
+}
+```
+
 Webhook/Scheduler integration: `POST /pipeline/trigger` with X-API-Key header.
 
 ---

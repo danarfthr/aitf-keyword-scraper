@@ -154,6 +154,7 @@ All read from `.env` via `python-dotenv`. Never hardcode. Key vars:
 - `POST /pipeline/trigger` — Enqueue scrape job for Scraper service (requires X-API-Key). Returns immediately.
 - `POST /pipeline/expire` — Expiry service runs on 30-min cron (informational only)
 - `GET /keywords/enriched` — Enriched keywords for Team 4 (public)
+- `GET /keywords/all` — All keywords across every status, with filters: `?status=`, `?source=`, `?search=`, `?since=`, `?limit=`, `?offset=` (public)
 - `GET /keywords/{id}` — Full keyword detail (public)
 
 ## Alembic Migrations

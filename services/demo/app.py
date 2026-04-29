@@ -62,9 +62,10 @@ selected_name = st.sidebar.radio(
     [
         "Pipeline Overview",
         "Trending Keywords",
-        "Relevance Results",
+        "LLM Decisions",
         "Enriched Keywords",
         "Failed Keywords",
+        "All Keywords",
     ],
     index=0,
 )
@@ -84,4 +85,7 @@ elif selected_name == "Enriched Keywords":
     m.render()
 elif selected_name == "Failed Keywords":
     from dashboard_pages import p05_failed_keywords as m
+    m.render()
+elif selected_name == "All Keywords":
+    from dashboard_pages import p06_all_keywords as m
     m.render()

@@ -42,9 +42,10 @@ graph TB
             ST["Streamlit App\n(Read-only, no DB access)"]
             P01["P01 Pipeline Overview"]
             P02["P02 Trending Keywords"]
-            P03["P03 Relevance Results"]
+            P03["P03 LLM Decisions"]
             P04["P04 Enriched Keywords"]
             P05["P05 Failed Keywords"]
+            P06["P06 All Keywords"]
         end
 
         subgraph "PostgreSQL"
@@ -226,6 +227,7 @@ graph LR
         HEALTH["GET /pipeline/health"]
         STUCK["GET /pipeline/stuck"]
         ENRICHED["GET /keywords/enriched"]
+        ALL["GET /keywords/all"]
         DETAIL["GET /keywords/{id}"]
         STATUS["GET /keywords/status/{status}"]
         RETRY["POST /pipeline/retry-failed\n(X-API-Key required)"]
@@ -240,6 +242,7 @@ graph LR
         ENRCH["/enriched → paginated enriched keywords"]
         DTL["/{id} → full detail + articles + justification + enrichment"]
         STAT["/status/{status} → filter by status/source/since"]
+        ALL_EP["/all → all keywords with status/source/search filters"]
         RTRY["/retry-failed → UPDATE failed → raw"]
     end
 
@@ -257,6 +260,7 @@ graph LR
     HEALTH --> HLTH --> KW
     STUCK --> STCK --> KW
     ENRICHED --> ENRCH --> KW
+    ALL --> ALL_EP --> KW
     DETAIL --> DTL --> KW
     DETAIL --> ART
     DETAIL --> JUST
@@ -426,9 +430,10 @@ graph TD
 
     NAV -->|"Option 1"| P01["P01 Pipeline Overview"]
     NAV -->|"Option 2"| P02["P02 Trending Keywords"]
-    NAV -->|"Option 3"| P03["P03 Relevance Results"]
+    NAV -->|"Option 3"| P03["P03 LLM Decisions"]
     NAV -->|"Option 4"| P04["P04 Enriched Keywords"]
     NAV -->|"Option 5"| P05["P05 Failed Keywords"]
+    NAV -->|"Option 6"| P06["P06 All Keywords"]
 
     subgraph "Shared Components"
         API["_api.py\nhttpx client → FastAPI"]
@@ -442,18 +447,21 @@ graph TD
     P03 --> API
     P04 --> API
     P05 --> API
+    P06 --> API
 
     P01 --> MODELS
     P02 --> MODELS
     P03 --> MODELS
     P04 --> MODELS
     P05 --> MODELS
+    P06 --> MODELS
 
     P01 --> CMPS
     P02 --> CMPS
     P03 --> CMPS
     P04 --> CMPS
     P05 --> CMPS
+    P06 --> CMPS
 
     API -->|"GET /pipeline/health"| FP["FastAPI (:8000)"]
     API -->|"GET /keywords/enriched"| FP
