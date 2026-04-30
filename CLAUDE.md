@@ -30,7 +30,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Stateless services**: All state lives in PostgreSQL only
 - **Keyword lifecycle**: Driven by `status` column (raw → news_sampled → enriched | expired | failed)
 - **Concurrency**: All polling queries use `SELECT FOR UPDATE SKIP LOCKED` to prevent race conditions
-- **Scraper trigger**: `POST /pipeline/trigger` writes a ScrapeRun row; Scraper service polls and executes
+- **Scraper service**: Polls `ScrapeRun` table for `status=running` rows, executes scrape cycle, updates `ScrapeRun.keywords_inserted` and `ScrapeRun.status`
 
 ## Key Commands
 
@@ -127,7 +127,7 @@ All read from `.env` via `python-dotenv`. Never hardcode. Key vars:
 │   │   ├── google_trends.py
 │   │   ├── delta.py
 │   │   └── main.py       # Entry point (polls ScrapeRun table)
-│   ├── sampler/          # Crawls detik/kompas/tribun news sites
+│   ├── sampler/          # Crawls detik/kompas/tribun/cnbc/cnn/antara news sites
 │   ├── llm/             # OpenRouter processor (combined justification + enrichment)
 │   ├── expiry/          # APScheduler cleanup job
 │   ├── api/             # FastAPI REST API
@@ -145,8 +145,8 @@ All read from `.env` via `python-dotenv`. Never hardcode. Key vars:
 | Scraper | `ScrapeRun` rows with `status=running` | Keywords with `status=raw` in PostgreSQL |
 | API | — | REST API. Creates ScrapeRun rows; `POST /pipeline/trigger` enqueues scrape jobs. |
 | Sampler | `status=raw` | Articles, sets `status=news_sampled` |
-| LLM (processor) | `status=news_sampled` | KeywordJustification + KeywordEnrichment; sets `status=enriched` (relevant) or `status=expired` (not relevant) |
-| Expiry | 3-pass cron (30 min) | Sets `status=expired` or `status=raw` (retry) |
+| LLM (processor) | `status=news_sampled` | Single LLM call; `status=enriched` (is_relevant=true) or `status=expired` (is_relevant=false); `llm_justified` eliminated |
+| Expiry | 3-pass cron (30 min) | Sets `status=expired` or `status=raw` (retry); Pass 1: stale enriched; Pass 2: is_relevant=false (immediate); Pass 3: failed retry |
 
 ## API Endpoints
 
@@ -155,7 +155,10 @@ All read from `.env` via `python-dotenv`. Never hardcode. Key vars:
 - `POST /pipeline/expire` — Expiry service runs on 30-min cron (informational only)
 - `GET /keywords/enriched` — Enriched keywords for Team 4 (public)
 - `GET /keywords/all` — All keywords across every status, with filters: `?status=`, `?source=`, `?search=`, `?since=`, `?limit=`, `?offset=` (public)
+- `GET /keywords/status/{status}` — Paginated keywords filtered by status (public)
 - `GET /keywords/{id}` — Full keyword detail (public)
+- `GET /pipeline/stuck` — Stuck keyword alerts and throughput metrics (public)
+- `POST /pipeline/retry-failed` — Immediately reset all failed keywords to raw (requires X-API-Key)
 
 ## Alembic Migrations
 
@@ -180,6 +183,8 @@ alembic upgrade head
 - **`user_agent_generator_config`**: Not supported by the installed Crawl4AI version (`ValidUAGenerator.generate()` rejects kwargs); use `user_agent_mode="random"` alone
 - **Tribun/Kompas**: Cloudflare-protected — intermittently blocks Docker egress IPs; optional proxy wired via `CRAWLER_PROXY_URL` / `CRAWLER_PROXY_USER` / `CRAWLER_PROXY_PASS` env vars
 - **0 articles on K-pop keywords**: Expected — hashtags like `#DearMySUNWOODay` don't appear in Indonesian news; not a crawler bug
+- **Sampler concurrency**: 6 crawlers (`detik`, `kompas`, `tribun`, `cnbc`, `cnn`, `antara`) run via `asyncio.gather`; first `MAX_ARTICLES_TOTAL_PER_KEYWORD` unique URLs are saved
+- **STALE_THRESHOLD_SECONDS**: Configurable env var (default 1800s/30min) — threshold for `/pipeline/stuck` alerts
 
 ## LLM / OpenRouter Notes
 
@@ -192,4 +197,4 @@ alembic upgrade head
 - After merging a feature branch: `git push -d origin <branch-name>` to delete the remote branch
 - Commit convention: `<scope>: <description>` (scopes: schema, shared, scraper, sampler, llm, expiry, api, demo, infra, tests)
 - All commits go to feature branches, then PR to `master`
-- Current active branch: `master`
+- Current active branch: `v3` (development); `master` is stable/production
