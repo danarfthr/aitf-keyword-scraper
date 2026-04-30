@@ -35,6 +35,8 @@ Thumbs.db
 .backup/
 .worktrees/
 .playwright-mcp/
+.agents/
+.junie/
 
 # Docker
 Dockerfile.local
@@ -50,6 +52,9 @@ docker-compose.local.yml
 *.db
 *.sqlite
 *.sqlite3
+
+# Data
+data/
 
 # Temp
 /tmp/heartbeat*
